@@ -42,7 +42,85 @@
    - F2: 停止脚本
    - F3: 显示帮助信息
 
-### 工作流说明
+### 配置说明
+
+所有配置都在 `config/settings.ini` 文件中进行。首次运行前，请确保该文件存在并正确配置。
+
+#### 1. 基本设置
+
+```ini
+[General]
+ClickInterval=2000        ; 点击间隔（毫秒）
+AutoStart=false          ; 是否自动开始（true/false）
+```
+
+#### 2. 任务配置
+
+每个任务都可以配置以下参数：
+- 名称（Name）
+- 点击坐标（Coords）
+- 等待时间（Wait）
+- 循环次数（Loops）
+
+示例配置：
+```ini
+[Tasks]
+; 刷流寇任务
+BanditName=刷流寇
+BanditCoords=890,533|1077,649|1078,348|1067,800
+BanditWait=52000
+BanditLoops=10
+
+; 采集肉任务
+CollectMeatName=采集肉
+CollectMeatCoords=888,530|1070,740|1070,645|1070,340|1080,800
+CollectMeatWait=2000
+CollectMeatLoops=1
+
+; 采集木任务
+CollectWoodName=采集木
+CollectWoodCoords=888,530|1130,740|1070,645|1070,340|1080,800
+CollectWoodWait=2000
+CollectWoodLoops=1
+
+; 采集煤任务
+CollectCoalName=采集煤
+CollectCoalCoords=888,530|1200,740|1070,645|1070,340|1080,800
+CollectCoalWait=2000
+CollectCoalLoops=1
+
+; 采集铁任务
+CollectIronName=采集铁
+CollectIronCoords=888,530|1270,740|1070,645|1070,340|1080,800
+CollectIronWait=2000
+CollectIronLoops=1
+```
+
+### 修改配置
+
+1. 修改点击坐标：
+   - 打开 `config/settings.ini`
+   - 找到对应任务的 `Coords` 参数
+   - 修改坐标值（格式：X,Y|X,Y|X,Y）
+   - 坐标使用屏幕绝对坐标
+
+2. 调整时间参数：
+   - `ClickInterval`: 控制每次点击之间的间隔（毫秒）
+   - 各任务的 `Wait` 参数：控制任务完成后的等待时间（毫秒）
+   - 各任务的 `Loops` 参数：控制任务重复执行的次数
+
+3. 自动启动：
+   - 设置 `AutoStart=true` 可以让脚本启动后自动开始运行
+   - 设置 `AutoStart=false` 需要手动按 F1 开始运行
+
+### 注意事项
+
+- 配置文件修改后，需要重启脚本才能生效
+- 坐标值需要根据实际屏幕分辨率调整
+- 时间参数可能需要根据网络延迟和游戏响应速度调整
+- 建议先在测试环境中调整参数，确认无误后再用于实际游戏
+
+## 工作流说明
 
 当前支持的工作流包括：
 

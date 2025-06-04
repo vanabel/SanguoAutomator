@@ -6,22 +6,98 @@ global isRunning := false
 global currentTask := 0
 global currentLoop := 0
 global totalTasks := 0
+global config := Map()
+
+; 设置使用绝对屏幕坐标
+CoordMode("Mouse", "Screen")
+
+; ========== 配置加载 ==========
+LoadConfig() {
+    global config
+    config := Map()
+    
+    ; 加载基本设置
+    config["ClickInterval"] := IniRead("config/settings.ini", "General", "ClickInterval", "2000")
+    config["AutoStart"] := IniRead("config/settings.ini", "General", "AutoStart", "false")
+    
+    ; 加载任务配置
+    config["Tasks"] := Map()
+    
+    ; 刷流寇任务
+    config["Tasks"]["Bandit"] := Map(
+        "name", IniRead("config/settings.ini", "Tasks", "BanditName", "刷流寇"),
+        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800")),
+        "wait", IniRead("config/settings.ini", "Tasks", "BanditWait", "52000"),
+        "loop", IniRead("config/settings.ini", "Tasks", "BanditLoops", "10")
+    )
+    
+    ; 采集任务
+    config["Tasks"]["CollectMeat"] := Map(
+        "name", IniRead("config/settings.ini", "Tasks", "CollectMeatName", "采集肉"),
+        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectMeatCoords", "888,530|1070,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("config/settings.ini", "Tasks", "CollectMeatWait", "2000"),
+        "loop", IniRead("config/settings.ini", "Tasks", "CollectMeatLoops", "1")
+    )
+    
+    config["Tasks"]["CollectWood"] := Map(
+        "name", IniRead("config/settings.ini", "Tasks", "CollectWoodName", "采集木"),
+        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectWoodCoords", "888,530|1130,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("config/settings.ini", "Tasks", "CollectWoodWait", "2000"),
+        "loop", IniRead("config/settings.ini", "Tasks", "CollectWoodLoops", "1")
+    )
+    
+    config["Tasks"]["CollectCoal"] := Map(
+        "name", IniRead("config/settings.ini", "Tasks", "CollectCoalName", "采集煤"),
+        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectCoalCoords", "888,530|1200,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("config/settings.ini", "Tasks", "CollectCoalWait", "2000"),
+        "loop", IniRead("config/settings.ini", "Tasks", "CollectCoalLoops", "1")
+    )
+    
+    config["Tasks"]["CollectIron"] := Map(
+        "name", IniRead("config/settings.ini", "Tasks", "CollectIronName", "采集铁"),
+        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectIronCoords", "888,530|1270,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("config/settings.ini", "Tasks", "CollectIronWait", "2000"),
+        "loop", IniRead("config/settings.ini", "Tasks", "CollectIronLoops", "1")
+    )
+}
+
+; 解析坐标字符串
+ParseCoords(coordStr) {
+    coords := []
+    for coord in StrSplit(coordStr, "|") {
+        xy := StrSplit(coord, ",")
+        coords.Push([Integer(xy[1]), Integer(xy[2])])
+    }
+    return coords
+}
 
 ; 任务队列定义
-global taskQueue := [
-    Map("name", "刷流寇", "coords", [[890, 533], [1077, 649], [1078, 348], [1067, 800]], "wait", 52000, "loop", 10),
-    Map("name", "采集肉", "coords", [[888,530], [1070,740], [1070,645], [1070,340], [1080,800]], "wait", 2000, "loop", 1),
-    Map("name", "采集木", "coords", [[888,530], [1130,740], [1070,645], [1070,340], [1080,800]], "wait", 2000, "loop", 1),
-    Map("name", "采集煤", "coords", [[888,530], [1200,740], [1070,645], [1070,340], [1080,800]], "wait", 2000, "loop", 1),
-    Map("name", "采集铁", "coords", [[888,530], [1270,740], [1070,645], [1070,340], [1080,800]], "wait", 2000, "loop", 1)
-]
+global taskQueue := []
 
 ; ========== 主函数 ==========
 Main() {
-    global totalTasks
+    global totalTasks, taskQueue, config
+    
+    ; 加载配置
+    LoadConfig()
+    
+    ; 构建任务队列
+    taskQueue := [
+        config["Tasks"]["Bandit"],
+        config["Tasks"]["CollectMeat"],
+        config["Tasks"]["CollectWood"],
+        config["Tasks"]["CollectCoal"],
+        config["Tasks"]["CollectIron"]
+    ]
+    
     totalTasks := taskQueue.Length
     ToolTip("三国工作流脚本已启动，按F1开始/暂停，按F2停止")
     SetTimer(CheckStatus, 1000)
+    
+    ; 如果配置了自动开始，则启动脚本
+    if (config["AutoStart"] = "true") {
+        isRunning := true
+    }
 }
 
 ; ========== 状态检查 ==========

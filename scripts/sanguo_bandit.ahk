@@ -5,12 +5,47 @@
 global isRunning := false
 global totalLoops := 10
 global currentLoop := 0
-global coords := [[890, 533], [1077, 649], [1078, 348], [1067, 800]]  ; 屏幕坐标
+global coords := []
+global config := Map()
+
+; 设置使用绝对屏幕坐标
+CoordMode("Mouse", "Screen")
+
+; ========== 配置加载 ==========
+LoadConfig() {
+    global config, coords, totalLoops
+    
+    ; 加载基本设置
+    config["ClickInterval"] := IniRead("config/settings.ini", "General", "ClickInterval", "2000")
+    config["AutoStart"] := IniRead("config/settings.ini", "General", "AutoStart", "false")
+    
+    ; 加载刷流寇任务配置
+    totalLoops := Integer(IniRead("config/settings.ini", "Tasks", "BanditLoops", "10"))
+    coords := ParseCoords(IniRead("config/settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800"))
+}
+
+; 解析坐标字符串
+ParseCoords(coordStr) {
+    coords := []
+    for coord in StrSplit(coordStr, "|") {
+        xy := StrSplit(coord, ",")
+        coords.Push([Integer(xy[1]), Integer(xy[2])])
+    }
+    return coords
+}
 
 ; ========== 主函数 ==========
 Main() {
+    ; 加载配置
+    LoadConfig()
+    
     ToolTip("三国刷流寇脚本已启动，按F1开始/暂停，按F2停止")
     SetTimer(CheckStatus, 1000)
+    
+    ; 如果配置了自动开始，则启动脚本
+    if (config["AutoStart"] = "true") {
+        isRunning := true
+    }
 }
 
 ; ========== 状态检查 ==========
