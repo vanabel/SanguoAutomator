@@ -1,6 +1,6 @@
-# GameAutomator
+# SanguoAutomator
 
-一个使用AutoHotkey实现的游戏自动化工具，可以模拟用户点击和键盘操作来完成游戏中的重复性任务。目前支持三国冰河时代游戏的自动化操作。
+一个使用AutoHotkey v2.0实现的游戏自动化工具，可以模拟用户点击和键盘操作来完成游戏中的重复性任务。目前支持三国冰河时代游戏的自动化操作。
 
 ## 功能特点
 
@@ -18,11 +18,13 @@
 ## 系统要求
 
 - Windows 操作系统
-- AutoHotkey v1.1 或更高版本
+- AutoHotkey v2.0（⚠️ 不兼容 v1.x 版本）
 
 ## 安装步骤
 
-1. 安装 [AutoHotkey](https://www.autohotkey.com/)
+1. 安装 [AutoHotkey v2.0](https://www.autohotkey.com/)
+   - 注意：必须安装 v2.0 版本，v1.x 版本不兼容
+   - 如果已安装 v1.x，建议先卸载再安装 v2.0
 2. 克隆此仓库到本地
 3. 根据需要修改脚本文件
 
