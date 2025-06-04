@@ -1,0 +1,20 @@
+# AutoHotkey编译文件
+*.exe
+
+# 临时文件
+*.tmp
+*.temp
+
+# 日志文件
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE文件
+.vscode/
+.idea/
+
+# 用户配置文件
+user_config.ini 
