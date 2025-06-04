@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; 设置工作目录为脚本所在目录的父目录
-SetWorkingDir(A_ScriptDir "\..")
+; 设置工作目录为脚本所在目录
+SetWorkingDir(A_ScriptDir)
 
 ; ========== 全局变量 ==========
 global isRunning := false
@@ -19,12 +19,12 @@ LoadConfig() {
     global config, coords, totalLoops
     
     ; 加载基本设置
-    config["ClickInterval"] := IniRead("config/settings.ini", "General", "ClickInterval", "2000")
-    config["AutoStart"] := IniRead("config/settings.ini", "General", "AutoStart", "false")
+    config["ClickInterval"] := IniRead("..\config\settings.ini", "General", "ClickInterval", "2000")
+    config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
     
     ; 加载华佗任务配置
-    totalLoops := Integer(IniRead("config/settings.ini", "Tasks", "HuaTuoLoops", "10"))
-    coords := ParseCoords(IniRead("config/settings.ini", "Tasks", "HuaTuoCoords", "1255,235|1260,770|1080,670|1070,345|1070,600|1070,800"))
+    totalLoops := Integer(IniRead("..\config\settings.ini", "Tasks", "HuaTuoLoops", "10"))
+    coords := ParseCoords(IniRead("..\config\settings.ini", "Tasks", "HuaTuoCoords", "1255,235|1260,770|1080,670|1070,345|1070,600|1070,800"))
     
     ; 显示加载的配置信息
     ToolTip("配置已加载：`n"

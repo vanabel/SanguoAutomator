@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; 设置工作目录为脚本所在目录的父目录
-SetWorkingDir(A_ScriptDir "\..")
+; 设置工作目录为脚本所在目录
+SetWorkingDir(A_ScriptDir)
 
 ; 全局变量
 global isRunning := false

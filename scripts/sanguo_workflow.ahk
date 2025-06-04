@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; 设置工作目录为脚本所在目录的父目录
-SetWorkingDir(A_ScriptDir "\..")
+; 设置工作目录为脚本所在目录
+SetWorkingDir(A_ScriptDir)
 
 ; ========== 全局变量 ==========
 global isRunning := false
@@ -20,47 +20,47 @@ LoadConfig() {
     config := Map()
     
     ; 加载基本设置
-    config["ClickInterval"] := IniRead("config/settings.ini", "General", "ClickInterval", "2000")
-    config["AutoStart"] := IniRead("config/settings.ini", "General", "AutoStart", "false")
+    config["ClickInterval"] := IniRead("..\config\settings.ini", "General", "ClickInterval", "2000")
+    config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
     
     ; 加载任务配置
     config["Tasks"] := Map()
     
     ; 刷流寇任务
     config["Tasks"]["Bandit"] := Map(
-        "name", IniRead("config/settings.ini", "Tasks", "BanditName", "刷流寇"),
-        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800")),
-        "wait", IniRead("config/settings.ini", "Tasks", "BanditWait", "52000"),
-        "loop", IniRead("config/settings.ini", "Tasks", "BanditLoops", "10")
+        "name", IniRead("..\config\settings.ini", "Tasks", "BanditName", "刷流寇"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "BanditWait", "52000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "BanditLoops", "10")
     )
     
     ; 采集任务
     config["Tasks"]["CollectMeat"] := Map(
-        "name", IniRead("config/settings.ini", "Tasks", "CollectMeatName", "采集肉"),
-        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectMeatCoords", "888,530|1070,740|1070,645|1070,340|1080,800")),
-        "wait", IniRead("config/settings.ini", "Tasks", "CollectMeatWait", "2000"),
-        "loop", IniRead("config/settings.ini", "Tasks", "CollectMeatLoops", "1")
+        "name", IniRead("..\config\settings.ini", "Tasks", "CollectMeatName", "采集肉"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "CollectMeatCoords", "888,530|1070,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "CollectMeatWait", "2000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "CollectMeatLoops", "1")
     )
     
     config["Tasks"]["CollectWood"] := Map(
-        "name", IniRead("config/settings.ini", "Tasks", "CollectWoodName", "采集木"),
-        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectWoodCoords", "888,530|1130,740|1070,645|1070,340|1080,800")),
-        "wait", IniRead("config/settings.ini", "Tasks", "CollectWoodWait", "2000"),
-        "loop", IniRead("config/settings.ini", "Tasks", "CollectWoodLoops", "1")
+        "name", IniRead("..\config\settings.ini", "Tasks", "CollectWoodName", "采集木"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "CollectWoodCoords", "888,530|1130,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "CollectWoodWait", "2000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "CollectWoodLoops", "1")
     )
     
     config["Tasks"]["CollectCoal"] := Map(
-        "name", IniRead("config/settings.ini", "Tasks", "CollectCoalName", "采集煤"),
-        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectCoalCoords", "888,530|1200,740|1070,645|1070,340|1080,800")),
-        "wait", IniRead("config/settings.ini", "Tasks", "CollectCoalWait", "2000"),
-        "loop", IniRead("config/settings.ini", "Tasks", "CollectCoalLoops", "1")
+        "name", IniRead("..\config\settings.ini", "Tasks", "CollectCoalName", "采集煤"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "CollectCoalCoords", "888,530|1200,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "CollectCoalWait", "2000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "CollectCoalLoops", "1")
     )
     
     config["Tasks"]["CollectIron"] := Map(
-        "name", IniRead("config/settings.ini", "Tasks", "CollectIronName", "采集铁"),
-        "coords", ParseCoords(IniRead("config/settings.ini", "Tasks", "CollectIronCoords", "888,530|1270,740|1070,645|1070,340|1080,800")),
-        "wait", IniRead("config/settings.ini", "Tasks", "CollectIronWait", "2000"),
-        "loop", IniRead("config/settings.ini", "Tasks", "CollectIronLoops", "1")
+        "name", IniRead("..\config\settings.ini", "Tasks", "CollectIronName", "采集铁"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "CollectIronCoords", "888,530|1270,740|1070,645|1070,340|1080,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "CollectIronWait", "2000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "CollectIronLoops", "1")
     )
     
     ; 显示加载的配置信息
