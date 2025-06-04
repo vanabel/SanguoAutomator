@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
+; 设置工作目录为脚本所在目录的父目录
+SetWorkingDir(A_ScriptDir "\..")
+
 ; ========== 全局变量 ==========
 global isRunning := false
 global totalLoops := 10
@@ -22,6 +25,14 @@ LoadConfig() {
     ; 加载刷流寇任务配置
     totalLoops := Integer(IniRead("config/settings.ini", "Tasks", "BanditLoops", "10"))
     coords := ParseCoords(IniRead("config/settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800"))
+    
+    ; 显示加载的配置信息
+    ToolTip("配置已加载：`n"
+        . "总轮数: " totalLoops "`n"
+        . "坐标数: " coords.Length "`n"
+        . "点击间隔: " config["ClickInterval"] "ms`n"
+        . "自动开始: " config["AutoStart"])
+    SetTimer(RemoveToolTip, -3000)
 }
 
 ; 解析坐标字符串

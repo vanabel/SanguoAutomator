@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
+; 设置工作目录为脚本所在目录的父目录
+SetWorkingDir(A_ScriptDir "\..")
+
 ; ========== 全局变量 ==========
 global isRunning := false
 global currentTask := 0
@@ -59,6 +62,13 @@ LoadConfig() {
         "wait", IniRead("config/settings.ini", "Tasks", "CollectIronWait", "2000"),
         "loop", IniRead("config/settings.ini", "Tasks", "CollectIronLoops", "1")
     )
+    
+    ; 显示加载的配置信息
+    ToolTip("配置已加载：`n"
+        . "任务数: " config["Tasks"].Count "`n"
+        . "点击间隔: " config["ClickInterval"] "ms`n"
+        . "自动开始: " config["AutoStart"])
+    SetTimer(RemoveToolTip, -3000)
 }
 
 ; 解析坐标字符串
