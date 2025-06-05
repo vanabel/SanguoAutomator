@@ -149,6 +149,7 @@ global config := Map()
 global regionStates := Map()  ; 存储区域状态
 global regionTexts := Map()   ; 存储区域文本
 global redDotStates := Map()  ; 存储红点状态
+global pToken := 0            ; GDI+ token
 
 ; 设置使用绝对屏幕坐标
 CoordMode("Mouse", "Screen")
@@ -721,6 +722,12 @@ ExecuteAllianceAction() {
 Main() {
     try {
         LogMessage("脚本启动")
+        
+        ; 初始化GDI+
+        if !pToken := Gdip_Startup() {
+            LogMessage("GDI+ 初始化失败！", "ERROR")
+            return
+        }
         
         ; 检查Tesseract是否安装
         if (!CheckTesseract()) {
