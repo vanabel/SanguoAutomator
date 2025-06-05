@@ -688,4 +688,25 @@ F3:: {  ; 显示帮助
         . "1. 识别预定义的屏幕区域`n"
         . "2. 分析每个区域的文字内容`n"
         . "3. 根据分析结果执行相应操作`n`n"
-        . "配置说明：`
+        . "配置说明：`n"
+        . "1. 在config/settings.ini中修改区域配置`n"
+        . "2. 可以调整区域坐标和大小`n"
+        . "3. 需要安装Tesseract OCR"
+    LogMessage("显示帮助信息")
+    MsgBox(helpMsg, "区域OCR脚本帮助")
+}
+
+; ========== 工具函数 ==========
+RemoveToolTip() {
+    ToolTip()
+}
+
+; ========== 退出处理 ==========
+ExitFunc(ExitReason, ExitCode) {
+    LogMessage("脚本退出，原因: " ExitReason)
+}
+
+OnExit(ExitFunc)
+
+; ========== 启动脚本 ==========
+Main()
