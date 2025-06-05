@@ -4,10 +4,37 @@
 ; 设置工作目录为脚本所在目录
 SetWorkingDir(A_ScriptDir)
 
+; ========== 日志函数 ==========
+LogMessage(message, level := "INFO") {
+    try {
+        ; 获取日志目录
+        logDir := A_ScriptDir "\..\logs"
+        if !DirExist(logDir)
+            DirCreate(logDir)
+            
+        ; 生成日志文件名（按日期）
+        logFile := logDir "\" FormatTime(, "yyyyMMdd") ".log"
+        
+        ; 格式化日志消息
+        timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
+        logMessage := timestamp " [" level "] " message "`n"
+        
+        ; 写入日志文件
+        FileAppend(logMessage, logFile)
+        
+        ; 同时显示在工具提示中
+        ToolTip(message)
+        SetTimer(RemoveToolTip, -3000)
+    } catch as err {
+        ToolTip("日志写入错误: " err.Message)
+        SetTimer(RemoveToolTip, -3000)
+    }
+}
+
 ; ========== GDI+ 初始化 ==========
 #Include Gdip_All.ahk
 if !pToken := Gdip_Startup() {
-    MsgBox("GDI+ 初始化失败！")
+    LogMessage("GDI+ 初始化失败！", "ERROR")
     ExitApp
 }
 
@@ -24,31 +51,42 @@ CoordMode("Pixel", "Screen")
 
 ; ========== 检查并创建必要的目录 ==========
 EnsureDirectories() {
-    ; 获取脚本所在目录的绝对路径
-    scriptDir := A_ScriptDir
-    
-    ; 创建images目录
-    imagesDir := scriptDir "\..\images"
-    if !DirExist(imagesDir)
-        DirCreate(imagesDir)
-    
-    ; 创建临时目录
-    tempDir := scriptDir "\..\temp"
-    if !DirExist(tempDir)
-        DirCreate(tempDir)
+    try {
+        ; 获取脚本所在目录的绝对路径
+        scriptDir := A_ScriptDir
         
-    return Map(
-        "images", imagesDir,
-        "temp", tempDir
-    )
+        ; 创建images目录
+        imagesDir := scriptDir "\..\images"
+        if !DirExist(imagesDir) {
+            DirCreate(imagesDir)
+            LogMessage("创建截图目录: " imagesDir)
+        }
+        
+        ; 创建临时目录
+        tempDir := scriptDir "\..\temp"
+        if !DirExist(tempDir) {
+            DirCreate(tempDir)
+            LogMessage("创建临时目录: " tempDir)
+        }
+        
+        return Map(
+            "images", imagesDir,
+            "temp", tempDir
+        )
+    } catch as err {
+        LogMessage("创建目录错误: " err.Message, "ERROR")
+        return Map()
+    }
 }
 
 ; ========== 检查Tesseract安装 ==========
 CheckTesseract() {
     try {
         RunWait('tesseract --version', , "Hide")
+        LogMessage("Tesseract OCR 检查通过")
         return true
     } catch as err {
+        LogMessage("未检测到Tesseract OCR！请安装Tesseract并确保添加到系统PATH", "ERROR")
         MsgBox("未检测到Tesseract OCR！`n`n"
             . "请按照以下步骤安装：`n"
             . "1. 访问 https://github.com/UB-Mannheim/tesseract/wiki`n"
@@ -63,47 +101,48 @@ CheckTesseract() {
 
 ; ========== 配置加载 ==========
 LoadConfig() {
-    global config
-    
-    ; 加载基本设置
-    config["ClickInterval"] := IniRead("..\config\settings.ini", "General", "ClickInterval", "2000")
-    config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
-    
-    ; 加载区域配置
-    config["Regions"] := Map()
-    
-    ; 读取所有区域配置
-    regions := IniRead("..\config\settings.ini", "Regions")
-    if (regions != "ERROR") {
-        for line in StrSplit(regions, "`n") {
-            if (line = "" || SubStr(line, 1, 1) = ";")
-                continue
-                
-            parts := StrSplit(line, "=")
-            if (parts.Length >= 2) {
-                section := Trim(parts[1])
-                value := Trim(parts[2])
-                valueParts := StrSplit(value, ",")
-                
-                if (valueParts.Length >= 5) {
-                    config["Regions"][section] := Map(
-                        "name", valueParts[1],
-                        "x1", Integer(valueParts[2]),
-                        "y1", Integer(valueParts[3]),
-                        "x2", Integer(valueParts[4]),
-                        "y2", Integer(valueParts[5])
-                    )
+    try {
+        global config
+        
+        ; 加载基本设置
+        config["ClickInterval"] := IniRead("..\config\settings.ini", "General", "ClickInterval", "2000")
+        config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
+        
+        ; 加载区域配置
+        config["Regions"] := Map()
+        
+        ; 读取所有区域配置
+        regions := IniRead("..\config\settings.ini", "Regions")
+        if (regions != "ERROR") {
+            for line in StrSplit(regions, "`n") {
+                if (line = "" || SubStr(line, 1, 1) = ";")
+                    continue
+                    
+                parts := StrSplit(line, "=")
+                if (parts.Length >= 2) {
+                    section := Trim(parts[1])
+                    value := Trim(parts[2])
+                    valueParts := StrSplit(value, ",")
+                    
+                    if (valueParts.Length >= 5) {
+                        config["Regions"][section] := Map(
+                            "name", valueParts[1],
+                            "x1", Integer(valueParts[2]),
+                            "y1", Integer(valueParts[3]),
+                            "x2", Integer(valueParts[4]),
+                            "y2", Integer(valueParts[5])
+                        )
+                    }
                 }
             }
         }
+        
+        LogMessage("配置已加载：区域数量: " config["Regions"].Count 
+            . ", 点击间隔: " config["ClickInterval"] "ms"
+            . ", 自动开始: " config["AutoStart"])
+    } catch as err {
+        LogMessage("加载配置错误: " err.Message, "ERROR")
     }
-    
-    ; 显示加载的配置信息
-    ToolTip("配置已加载：`n"
-        . "区域数量: " config["Regions"].Count "`n"
-        . "点击间隔: " config["ClickInterval"] "ms`n"
-        . "自动开始: " config["AutoStart"])
-    SetTimer(RemoveToolTip, -3000)
 }
 
 ; ========== 截图函数 ==========
@@ -165,10 +204,10 @@ CaptureRegion(region, regionKey) {
         ; 释放资源
         Gdip_DisposeImage(screenshot)
         
+        LogMessage("截图成功: " filename)
         return filename
     } catch as err {
-        ToolTip("截图错误: " err.Message "`n路径: " (filename ?? "未知"))
-        SetTimer(RemoveToolTip, -3000)
+        LogMessage("截图错误: " err.Message "`n路径: " (filename ?? "未知"), "ERROR")
         return ""
     }
 }
@@ -187,10 +226,15 @@ PerformOCR(imagePath) {
         
         ; 清理文本
         text := Trim(text)
-        return text ? text : "未识别到文字"
+        if (text) {
+            LogMessage("OCR识别成功: " text)
+            return text
+        } else {
+            LogMessage("未识别到文字", "WARNING")
+            return "未识别到文字"
+        }
     } catch as err {
-        ToolTip("OCR错误: " err.Message)
-        SetTimer(RemoveToolTip, -3000)
+        LogMessage("OCR错误: " err.Message, "ERROR")
         return "OCR错误: " err.Message
     }
 }
@@ -218,12 +262,14 @@ DetectRedDot(region) {
                     }
                 }
             }
-            return redCount >= 10  ; 如果周围有足够多的红色像素，认为是红点
+            hasRedDot := redCount >= 10
+            LogMessage("红点检测: " (hasRedDot ? "发现红点" : "未发现红点"))
+            return hasRedDot
         }
+        LogMessage("红点检测: 未发现红点")
         return false
     } catch as err {
-        ToolTip("红点检测错误: " err.Message)
-        SetTimer(RemoveToolTip, -3000)
+        LogMessage("红点检测错误: " err.Message, "ERROR")
         return false
     }
 }
@@ -251,15 +297,12 @@ AnalyzeRegionState() {
                 state := AnalyzeText(regionKey, text)
                 regionStates[regionKey] := state
                 
-                ; 显示状态
-                ToolTip("区域 [" region["name"] "] 状态: " state "`n"
-                    . "文本: " text "`n"
-                    . "红点: " (hasRedDot ? "有" : "无"))
-                SetTimer(RemoveToolTip, -1000)
+                LogMessage("区域 [" region["name"] "] 状态: " state 
+                    . "`n文本: " text 
+                    . "`n红点: " (hasRedDot ? "有" : "无"))
             }
         } catch as err {
-            ToolTip("区域分析错误 [" region["name"] "]: " err.Message)
-            SetTimer(RemoveToolTip, -3000)
+            LogMessage("区域分析错误 [" region["name"] "]: " err.Message, "ERROR")
         }
     }
 }
@@ -505,23 +548,31 @@ ExecuteAllianceAction() {
 
 ; ========== 主函数 ==========
 Main() {
-    ; 检查Tesseract是否安装
-    if (!CheckTesseract()) {
-        return
-    }
-    
-    ; 确保必要的目录存在
-    EnsureDirectories()
-    
-    ; 加载配置
-    LoadConfig()
-    
-    ToolTip("区域OCR脚本已启动，按F1开始/暂停，按F2停止")
-    SetTimer(CheckStatus, 1000)
-    
-    ; 如果配置了自动开始，则启动脚本
-    if (config["AutoStart"] = "true") {
-        isRunning := true
+    try {
+        LogMessage("脚本启动")
+        
+        ; 检查Tesseract是否安装
+        if (!CheckTesseract()) {
+            LogMessage("Tesseract未安装，脚本退出", "ERROR")
+            return
+        }
+        
+        ; 确保必要的目录存在
+        EnsureDirectories()
+        
+        ; 加载配置
+        LoadConfig()
+        
+        LogMessage("区域OCR脚本已启动，按F1开始/暂停，按F2停止")
+        SetTimer(CheckStatus, 1000)
+        
+        ; 如果配置了自动开始，则启动脚本
+        if (config["AutoStart"] = "true") {
+            isRunning := true
+            LogMessage("自动开始已启用")
+        }
+    } catch as err {
+        LogMessage("脚本启动错误: " err.Message, "ERROR")
     }
 }
 
@@ -529,14 +580,18 @@ Main() {
 CheckStatus() {
     global isRunning
     if (isRunning) {
-        ; 分析区域状态
-        AnalyzeRegionState()
-        
-        ; 执行相应操作
-        ExecuteAction()
-        
-        ; 等待指定时间后继续
-        Sleep(config["ClickInterval"])
+        try {
+            ; 分析区域状态
+            AnalyzeRegionState()
+            
+            ; 执行相应操作
+            ExecuteAction()
+            
+            ; 等待指定时间后继续
+            Sleep(config["ClickInterval"])
+        } catch as err {
+            LogMessage("状态检查错误: " err.Message, "ERROR")
+        }
     }
 }
 
@@ -545,20 +600,20 @@ F1:: {  ; 开始/暂停
     global isRunning
     isRunning := !isRunning
     if (isRunning) {
-        ToolTip("脚本运行中...")
+        LogMessage("脚本运行中...")
     } else {
-        ToolTip("脚本已暂停")
+        LogMessage("脚本已暂停")
     }
 }
 
 F2:: {  ; 停止
     global isRunning
     isRunning := false
-    ToolTip("脚本已停止")
+    LogMessage("脚本已停止")
 }
 
 F3:: {  ; 显示帮助
-    MsgBox("快捷键说明：`n"
+    helpMsg := "快捷键说明：`n"
         . "F1 - 开始/暂停脚本`n"
         . "F2 - 停止脚本`n"
         . "F3 - 显示此帮助信息`n`n"
@@ -569,7 +624,9 @@ F3:: {  ; 显示帮助
         . "配置说明：`n"
         . "1. 在config/settings.ini中修改区域配置`n"
         . "2. 可以调整区域坐标和大小`n"
-        . "3. 需要安装Tesseract OCR", "区域OCR脚本帮助")
+        . "3. 需要安装Tesseract OCR"
+    LogMessage("显示帮助信息")
+    MsgBox(helpMsg, "区域OCR脚本帮助")
 }
 
 ; ========== 工具函数 ==========
@@ -580,6 +637,7 @@ RemoveToolTip() {
 ; ========== 退出处理 ==========
 ExitFunc(ExitReason, ExitCode) {
     global pToken
+    LogMessage("脚本退出，原因: " ExitReason)
     Gdip_Shutdown(pToken)
 }
 
