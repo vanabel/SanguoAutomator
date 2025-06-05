@@ -182,9 +182,31 @@ CaptureRegion(region, regionKey) {
         
         ; 使用TXGYMailCamera.dll进行截图
         try {
-            ; 加载DLL
-            if !DllCall("LoadLibrary", "str", "TXGYMailCamera.dll") {
-                throw Error("加载TXGYMailCamera.dll失败")
+            ; 尝试多个可能的DLL路径
+            dllPaths := [
+                A_ScriptDir "\TXGYMailCamera.dll",  ; 脚本目录
+                A_ScriptDir "\..\TXGYMailCamera.dll",  ; 上级目录
+                "C:\Windows\System32\TXGYMailCamera.dll",  ; System32目录
+                "TXGYMailCamera.dll"  ; 当前目录
+            ]
+            
+            dllLoaded := false
+            for dllPath in dllPaths {
+                if FileExist(dllPath) {
+                    LogMessage("尝试加载DLL: " dllPath)
+                    if hModule := DllCall("LoadLibrary", "str", dllPath, "ptr") {
+                        dllLoaded := true
+                        LogMessage("成功加载DLL: " dllPath)
+                        break
+                    } else {
+                        errorCode := A_LastError
+                        LogMessage("加载DLL失败: " dllPath " (错误代码: " errorCode ")", "ERROR")
+                    }
+                }
+            }
+            
+            if !dllLoaded {
+                throw Error("无法加载TXGYMailCamera.dll，请确保DLL文件存在且可访问")
             }
             
             ; 调用截图函数
