@@ -288,7 +288,7 @@ CaptureRegion(region, regionKey) {
         
         ; 获取英文名称，如果不存在则使用区域键名
         namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
-        filename := imagesDir "\" namePrefix "_" timestamp ".png"
+        filename := imagesDir "\" namePrefix "_" timestamp ".bmp"  ; 使用BMP格式
         
         ; 使用Windows截图功能
         try {
@@ -318,7 +318,7 @@ CaptureRegion(region, regionKey) {
                 throw Error("复制屏幕内容失败")
             }
             
-            ; 保存为PNG
+            ; 保存为BMP
             if !SaveBitmapToFile(hBitmap, filename) {
                 throw Error("保存图片失败")
             }
@@ -350,36 +350,69 @@ CreateBitmap(width, height) {
     return hBitmap
 }
 
-; ========== 保存位图为PNG ==========
+; ========== 保存位图为BMP ==========
 SaveBitmapToFile(hBitmap, filename) {
     try {
-        ; 初始化GDI+
-        if !pToken := Gdip_Startup() {
-            throw Error("GDI+初始化失败")
+        ; 创建位图信息头
+        bi := Buffer(40, 0)  ; sizeof(BITMAPINFOHEADER) = 40
+        NumPut("uint", 40, bi, 0)           ; biSize
+        NumPut("uint", region["x2"] - region["x1"], bi, 4)  ; biWidth
+        NumPut("uint", -(region["y2"] - region["y1"]), bi, 8)  ; biHeight (负值表示自上而下)
+        NumPut("ushort", 1, bi, 12)         ; biPlanes
+        NumPut("ushort", 32, bi, 14)        ; biBitCount
+        NumPut("uint", 0, bi, 16)           ; biCompression
+        NumPut("uint", 0, bi, 20)           ; biSizeImage
+        NumPut("uint", 0, bi, 24)           ; biXPelsPerMeter
+        NumPut("uint", 0, bi, 28)           ; biYPelsPerMeter
+        NumPut("uint", 0, bi, 32)           ; biClrUsed
+        NumPut("uint", 0, bi, 36)           ; biClrImportant
+        
+        ; 创建文件
+        file := FileOpen(filename, "w")
+        if !file {
+            throw Error("无法创建文件: " filename)
         }
         
-        ; 从HBITMAP创建GDI+位图
-        pBitmap := 0
-        if DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", 0, "ptr*", &pBitmap) {
-            throw Error("创建GDI+位图失败")
+        ; 写入BMP文件头
+        file.WriteUInt(0x4D42)              ; 签名 "BM"
+        file.WriteUInt(54 + (region["x2"] - region["x1"]) * (region["y2"] - region["y1"]) * 4)  ; 文件大小
+        file.WriteUInt(0)                   ; 保留
+        file.WriteUInt(54)                  ; 位图数据偏移
+        file.Write(bi)                      ; 位图信息头
+        
+        ; 获取位图数据
+        hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
+        if !hdc {
+            throw Error("创建DC失败")
         }
         
-        ; 获取PNG编码器CLSID
-        if !CLSID := Gdip_GetEncoderClsid("image/png") {
-            throw Error("获取PNG编码器失败")
+        DllCall("SelectObject", "ptr", hdc, "ptr", hBitmap)
+        
+        ; 分配内存
+        size := (region["x2"] - region["x1"]) * (region["y2"] - region["y1"]) * 4
+        pBits := Buffer(size, 0)
+        
+        ; 获取位图数据
+        if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", region["y2"] - region["y1"], "ptr", pBits, "ptr", bi, "uint", 0) {
+            throw Error("获取位图数据失败")
         }
         
-        ; 保存为PNG
-        if DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", filename, "ptr", CLSID, "ptr", 0) {
-            throw Error("保存图片失败")
-        }
+        ; 写入位图数据
+        file.RawWrite(pBits, size)
         
         ; 清理资源
-        Gdip_DisposeImage(pBitmap)
-        Gdip_Shutdown(pToken)
+        DllCall("DeleteDC", "ptr", hdc)
+        file.Close()
         
+        ; 验证文件是否创建成功
+        if !FileExist(filename) {
+            throw Error("文件创建失败: " filename)
+        }
+        
+        LogMessage("图片保存成功: " filename)
         return true
     } catch as err {
+        LogMessage("保存位图失败: " err.Message, "ERROR")
         throw Error("保存位图失败: " err.Message)
     }
 }
