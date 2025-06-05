@@ -101,7 +101,11 @@ RaidBanditCamp() {
     
     ; 随机选择一个坐标
     if (banditCampCoords.Length = 0) {
-        throw Error("没有可用的坐标点")
+        LogMessage("坐标点数组为空，重新加载配置")
+        LoadConfig()
+        if (banditCampCoords.Length = 0) {
+            throw Error("没有可用的坐标点")
+        }
     }
     
     randomIndex := Random(1, banditCampCoords.Length)
@@ -131,6 +135,7 @@ MainLoop() {
             Sleep(1000)  ; 每秒检查一次
         } catch as err {
             LogMessage("执行错误: " err.Message, "ERROR")
+            Sleep(5000)  ; 发生错误时等待5秒再继续
         }
     }
 }
@@ -181,7 +186,7 @@ Main() {
         LoadConfig()
         
         ; 如果配置了自动开始，则启动脚本
-        if (IniRead("..\config\settings.ini", "General", "AutoStart", "false") = "true") {
+        if (IniRead("config\settings.ini", "General", "AutoStart", "false") = "true") {
             isRunning := true
             LogMessage("自动开始已启用")
         }
