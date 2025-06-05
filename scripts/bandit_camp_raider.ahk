@@ -13,8 +13,8 @@ global banditCampInterval := 300000  ; 5分钟 = 300000毫秒
 LoadConfig() {
     try {
         ; 加载基本设置
-        maxBanditCampCount := IniRead("config\settings.ini", "Tasks", "BanditCampLoops", "10")
-        banditCampInterval := IniRead("config\settings.ini", "Tasks", "BanditCampWait", "300000")
+        maxBanditCampCount := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampLoops", "10"))
+        banditCampInterval := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampWait", "300000"))
         
         ; 加载坐标点
         banditCampCoords := []
@@ -23,12 +23,16 @@ LoadConfig() {
             for coord in StrSplit(coordsStr, "|") {
                 parts := StrSplit(coord, ",")
                 if (parts.Length >= 2) {
-                    banditCampCoords.Push(Map(
-                        "x", Integer(parts[1]),
-                        "y", Integer(parts[2])
-                    ))
+                    banditCampCoords.Push({
+                        x: Integer(parts[1]),
+                        y: Integer(parts[2])
+                    })
                 }
             }
+        }
+        
+        if (banditCampCoords.Length = 0) {
+            throw Error("没有找到有效的坐标点配置")
         }
         
         LogMessage("配置已加载：最大次数: " maxBanditCampCount 
@@ -36,14 +40,16 @@ LoadConfig() {
             . ", 坐标点数量: " banditCampCoords.Length)
     } catch as err {
         LogMessage("加载配置错误: " err.Message, "ERROR")
+        throw err
     }
 }
 
 ; ========== 日志函数 ==========
 LogMessage(message, level := "INFO") {
     try {
-        ; 获取日志目录
-        logDir := "logs"
+        ; 获取日志目录（使用脚本所在目录）
+        scriptDir := A_ScriptDir
+        logDir := scriptDir "\logs"
         if !DirExist(logDir)
             DirCreate(logDir)
             
@@ -68,7 +74,7 @@ LogMessage(message, level := "INFO") {
 
 ; ========== 刷山贼营寨 ==========
 RaidBanditCamp() {
-    global banditCampCount, maxBanditCampCount, lastBanditCampTime, banditCampInterval
+    global banditCampCount, maxBanditCampCount, lastBanditCampTime, banditCampInterval, banditCampCoords
     
     ; 检查是否达到最大次数
     if (banditCampCount >= maxBanditCampCount) {
@@ -85,16 +91,20 @@ RaidBanditCamp() {
     }
     
     ; 随机选择一个坐标
+    if (banditCampCoords.Length = 0) {
+        throw Error("没有可用的坐标点")
+    }
+    
     randomIndex := Random(1, banditCampCoords.Length)
     coord := banditCampCoords[randomIndex]
     
     ; 点击坐标
-    Click(coord["x"], coord["y"])
-    LogMessage("点击山贼营寨坐标: " coord["x"] ", " coord["y"])
+    Click(coord.x, coord.y)
+    LogMessage("点击山贼营寨坐标: " coord.x ", " coord.y)
     
     ; 等待确认按钮出现并点击
     Sleep(1000)
-    Click(coord["x"] + 50, coord["y"] + 50)  ; 点击确认按钮位置
+    Click(coord.x + 50, coord.y + 50)  ; 点击确认按钮位置
     
     ; 更新计数和时间
     banditCampCount++

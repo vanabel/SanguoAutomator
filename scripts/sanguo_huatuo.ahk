@@ -24,7 +24,7 @@ LoadConfig() {
     
     ; 加载华佗任务配置
     totalLoops := Integer(IniRead("..\config\settings.ini", "Tasks", "HuaTuoLoops", "10"))
-    coords := ParseCoords(IniRead("..\config\settings.ini", "Tasks", "HuaTuoCoords", "1255,235|1260,770|1080,670|1070,345|1070,600|1070,800"))
+    coords := ParseCoords(IniRead("..\config\settings.ini", "Tasks", "HuaTuoCoords", "1255,235|1060,780|1080,670|1070,345|1070,600|1070,800"))
     
     ; 显示加载的配置信息
     ToolTip("配置已加载：`n"
