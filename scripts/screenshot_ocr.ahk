@@ -123,7 +123,33 @@ CaptureRegion(region) {
         
         ; 保存截图
         timestamp := FormatTime(, "yyyyMMdd_HHmmss")
-        filename := imagesDir "\" region["name"] "_" timestamp ".png"
+        ; 使用英文名称作为文件名前缀
+        regionName := Map(
+            "AvatarRegion", "avatar",
+            "TitleRegion", "title",
+            "ResourceRegion", "resource",
+            "PopularityRegion", "popularity",
+            "WorkStatusRegion", "work_status",
+            "StaminaRegion", "stamina",
+            "CombatPowerRegion", "combat_power",
+            "BuffRegion", "buff",
+            "ActivityRegion", "activity",
+            "MarchStatusRegion", "march_status",
+            "QueueRegion", "queue",
+            "BanditRegion", "bandit",
+            "ExpeditionQueueRegion", "expedition_queue",
+            "MessageRegion", "message",
+            "ChatRegion", "chat",
+            "ConquestRegion", "conquest",
+            "HeroRegion", "hero",
+            "BagRegion", "bag",
+            "AllianceRegion", "alliance",
+            "TownRegion", "town"
+        )
+        
+        ; 获取英文名称，如果不存在则使用原始名称
+        namePrefix := regionName.Has(region["name"]) ? regionName[region["name"]] : region["name"]
+        filename := imagesDir "\" namePrefix "_" timestamp ".png"
         
         ; 保存图片
         result := Gdip_SaveBitmapToFile(screenshot, filename)
