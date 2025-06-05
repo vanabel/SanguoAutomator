@@ -6,7 +6,7 @@ SetWorkingDir(A_ScriptDir "\..")
 
 ; ========== 全局变量 ==========
 global isRunning := false
-global banditCampCoords := []
+global banditCampCoords := Array()  ; 使用Array()而不是[]
 global banditCampCount := 0
 global maxBanditCampCount := 10
 global lastBanditCampTime := 0
@@ -24,7 +24,7 @@ LoadConfig() {
         banditCampInterval := Integer(IniRead(configPath, "Tasks", "BanditCampWait", "300000"))
         
         ; 加载坐标点
-        banditCampCoords := []
+        banditCampCoords := Array()  ; 重置数组
         coordsStr := IniRead(configPath, "Tasks", "BanditCampCoords", "")
         LogMessage("读取到的坐标字符串: " coordsStr)
         
@@ -32,10 +32,10 @@ LoadConfig() {
             for coord in StrSplit(coordsStr, "|") {
                 parts := StrSplit(coord, ",")
                 if (parts.Length >= 2) {
-                    banditCampCoords.Push({
-                        x: Integer(parts[1]),
-                        y: Integer(parts[2])
-                    })
+                    banditCampCoords.Push(Map(
+                        "x", Integer(parts[1]),
+                        "y", Integer(parts[2])
+                    ))
                     LogMessage("添加坐标点: " parts[1] ", " parts[2])
                 }
             }
@@ -112,12 +112,12 @@ RaidBanditCamp() {
     coord := banditCampCoords[randomIndex]
     
     ; 点击坐标
-    Click(coord.x, coord.y)
-    LogMessage("点击山贼营寨坐标: " coord.x ", " coord.y)
+    Click(coord["x"], coord["y"])
+    LogMessage("点击山贼营寨坐标: " coord["x"] ", " coord["y"])
     
     ; 等待确认按钮出现并点击
     Sleep(1000)
-    Click(coord.x + 50, coord.y + 50)  ; 点击确认按钮位置
+    Click(coord["x"] + 50, coord["y"] + 50)  ; 点击确认按钮位置
     
     ; 更新计数和时间
     banditCampCount++
