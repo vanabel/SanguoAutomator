@@ -6,52 +6,45 @@ SetWorkingDir(A_ScriptDir "\..")
 
 ; ========== 全局变量 ==========
 global isRunning := false
-global banditCampCoords := Array()  ; 使用Array()而不是[]
 global banditCampCount := 0
 global maxBanditCampCount := 10
 global lastBanditCampTime := 0
 global banditCampInterval := 300000  ; 5分钟 = 300000毫秒
+global coords := []
+global config := Map()
+
+; 设置使用绝对屏幕坐标
+CoordMode("Mouse", "Screen")
 
 ; ========== 加载配置 ==========
 LoadConfig() {
-    try {
-        ; 加载基本设置
-        LogMessage("正在加载配置文件...")
-        configPath := "config\settings.ini"
-        LogMessage("配置文件路径: " configPath)
-        
-        maxBanditCampCount := Integer(IniRead(configPath, "Tasks", "BanditCampLoops", "10"))
-        banditCampInterval := Integer(IniRead(configPath, "Tasks", "BanditCampWait", "300000"))
-        
-        ; 加载坐标点
-        banditCampCoords := Array()  ; 重置数组
-        coordsStr := IniRead(configPath, "Tasks", "BanditCampCoords", "")
-        LogMessage("读取到的坐标字符串: " coordsStr)
-        
-        if (coordsStr != "ERROR") {
-            for coord in StrSplit(coordsStr, "|") {
-                parts := StrSplit(coord, ",")
-                if (parts.Length >= 2) {
-                    banditCampCoords.Push(Map(
-                        "x", Integer(parts[1]),
-                        "y", Integer(parts[2])
-                    ))
-                    LogMessage("添加坐标点: " parts[1] ", " parts[2])
-                }
-            }
-        }
-        
-        if (banditCampCoords.Length = 0) {
-            throw Error("没有找到有效的坐标点配置")
-        }
-        
-        LogMessage("配置已加载：最大次数: " maxBanditCampCount 
-            . ", 间隔时间: " (banditCampInterval / 60000) "分钟"
-            . ", 坐标点数量: " banditCampCoords.Length)
-    } catch as err {
-        LogMessage("加载配置错误: " err.Message, "ERROR")
-        throw err
+    global config, coords, maxBanditCampCount, banditCampInterval
+    
+    ; 加载基本设置
+    config["ClickInterval"] := IniRead("config\settings.ini", "General", "ClickInterval", "2000")
+    config["AutoStart"] := IniRead("config\settings.ini", "General", "AutoStart", "false")
+    
+    ; 加载山贼营寨任务配置
+    maxBanditCampCount := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampLoops", "10"))
+    banditCampInterval := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampWait", "300000"))
+    coords := ParseCoords(IniRead("config\settings.ini", "Tasks", "BanditCampCoords", "890,537|990,750|1070,650|1070,350|1070,600|1070,800"))
+    
+    ; 显示加载的配置信息
+    LogMessage("配置已加载：`n"
+        . "总轮数: " maxBanditCampCount "`n"
+        . "坐标数: " coords.Length "`n"
+        . "点击间隔: " config["ClickInterval"] "ms`n"
+        . "自动开始: " config["AutoStart"])
+}
+
+; 解析坐标字符串
+ParseCoords(coordStr) {
+    coords := []
+    for coord in StrSplit(coordStr, "|") {
+        xy := StrSplit(coord, ",")
+        coords.Push([Integer(xy[1]), Integer(xy[2])])
     }
+    return coords
 }
 
 ; ========== 日志函数 ==========
@@ -83,7 +76,7 @@ LogMessage(message, level := "INFO") {
 
 ; ========== 刷山贼营寨 ==========
 RaidBanditCamp() {
-    global banditCampCount, maxBanditCampCount, lastBanditCampTime, banditCampInterval, banditCampCoords
+    global banditCampCount, maxBanditCampCount, lastBanditCampTime, banditCampInterval, coords
     
     ; 检查是否达到最大次数
     if (banditCampCount >= maxBanditCampCount) {
@@ -100,24 +93,24 @@ RaidBanditCamp() {
     }
     
     ; 随机选择一个坐标
-    if (banditCampCoords.Length = 0) {
+    if (coords.Length = 0) {
         LogMessage("坐标点数组为空，重新加载配置")
         LoadConfig()
-        if (banditCampCoords.Length = 0) {
+        if (coords.Length = 0) {
             throw Error("没有可用的坐标点")
         }
     }
     
-    randomIndex := Random(1, banditCampCoords.Length)
-    coord := banditCampCoords[randomIndex]
+    randomIndex := Random(1, coords.Length)
+    coord := coords[randomIndex]
     
     ; 点击坐标
-    Click(coord["x"], coord["y"])
-    LogMessage("点击山贼营寨坐标: " coord["x"] ", " coord["y"])
+    Click(coord[1], coord[2])
+    LogMessage("点击山贼营寨坐标: " coord[1] ", " coord[2])
     
     ; 等待确认按钮出现并点击
     Sleep(1000)
-    Click(coord["x"] + 50, coord["y"] + 50)  ; 点击确认按钮位置
+    Click(coord[1] + 50, coord[2] + 50)  ; 点击确认按钮位置
     
     ; 更新计数和时间
     banditCampCount++
@@ -186,7 +179,7 @@ Main() {
         LoadConfig()
         
         ; 如果配置了自动开始，则启动脚本
-        if (IniRead("config\settings.ini", "General", "AutoStart", "false") = "true") {
+        if (config["AutoStart"] = "true") {
             isRunning := true
             LogMessage("自动开始已启用")
         }
