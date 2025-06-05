@@ -22,6 +22,17 @@ global redDotStates := Map()  ; 存储红点状态
 CoordMode("Mouse", "Screen")
 CoordMode("Pixel", "Screen")
 
+; ========== 检查并创建必要的目录 ==========
+EnsureDirectories() {
+    ; 创建images目录
+    if !DirExist("..\images")
+        DirCreate("..\images")
+    
+    ; 创建临时目录
+    if !DirExist("..\temp")
+        DirCreate("..\temp")
+}
+
 ; ========== 检查Tesseract安装 ==========
 CheckTesseract() {
     try {
@@ -87,59 +98,91 @@ LoadConfig() {
 
 ; ========== 截图函数 ==========
 CaptureRegion(region) {
-    ; 创建截图对象
-    screenshot := Gdip_BitmapFromScreen(region["x1"] "|" region["y1"] "|" 
-        . (region["x2"] - region["x1"]) "|" (region["y2"] - region["y1"]))
-    
-    ; 保存截图
-    timestamp := FormatTime(, "yyyyMMdd_HHmmss")
-    filename := "..\images\" region["name"] "_" timestamp ".png"
-    Gdip_SaveBitmapToFile(screenshot, filename)
-    
-    ; 释放资源
-    Gdip_DisposeImage(screenshot)
-    
-    return filename
+    try {
+        ; 创建截图对象
+        screenshot := Gdip_BitmapFromScreen(region["x1"] "|" region["y1"] "|" 
+            . (region["x2"] - region["x1"]) "|" (region["y2"] - region["y1"]))
+        
+        if !screenshot {
+            throw Error("截图失败")
+        }
+        
+        ; 保存截图
+        timestamp := FormatTime(, "yyyyMMdd_HHmmss")
+        filename := "..\images\" region["name"] "_" timestamp ".png"
+        
+        ; 确保目录存在
+        EnsureDirectories()
+        
+        ; 保存图片
+        if Gdip_SaveBitmapToFile(screenshot, filename) != 0 {
+            throw Error("保存图片失败")
+        }
+        
+        ; 释放资源
+        Gdip_DisposeImage(screenshot)
+        
+        return filename
+    } catch as err {
+        ToolTip("截图错误: " err.Message)
+        SetTimer(RemoveToolTip, -3000)
+        return ""
+    }
 }
 
 ; ========== OCR函数 ==========
 PerformOCR(imagePath) {
     try {
+        if !FileExist(imagePath) {
+            throw Error("图片文件不存在: " imagePath)
+        }
+        
         ; 使用Tesseract OCR进行文字识别
         shell := ComObject("WScript.Shell")
-        exec := shell.Exec('tesseract "' imagePath '" stdout -l chi_sim')
+        exec := shell.Exec('tesseract "' imagePath '" stdout -l chi_sim --psm 6')
         text := exec.StdOut.ReadAll()
+        
+        ; 清理文本
+        text := Trim(text)
         return text ? text : "未识别到文字"
     } catch as err {
+        ToolTip("OCR错误: " err.Message)
+        SetTimer(RemoveToolTip, -3000)
         return "OCR错误: " err.Message
     }
 }
 
 ; ========== 检测红点 ==========
 DetectRedDot(region) {
-    ; 设置颜色容差
-    colorVariation := 30  ; 颜色容差范围
-    
-    ; 计算右上角10x10区域
-    dotX1 := region["x2"] - 10  ; 从右边界向左10像素
-    dotY1 := region["y1"]       ; 从顶部开始
-    dotX2 := region["x2"]       ; 右边界
-    dotY2 := region["y1"] + 10  ; 向下10像素
-    
-    ; 在指定区域内搜索红色像素
-    if (PixelSearch(&foundX, &foundY, dotX1, dotY1, dotX2, dotY2, 0xFF0000, colorVariation)) {
-        ; 检查周围像素是否也是红色（确认是红点而不是噪点）
-        redCount := 0
-        loop 10 {
+    try {
+        ; 设置颜色容差
+        colorVariation := 30  ; 颜色容差范围
+        
+        ; 计算右上角10x10区域
+        dotX1 := region["x2"] - 10  ; 从右边界向左10像素
+        dotY1 := region["y1"]       ; 从顶部开始
+        dotX2 := region["x2"]       ; 右边界
+        dotY2 := region["y1"] + 10  ; 向下10像素
+        
+        ; 在指定区域内搜索红色像素
+        if (PixelSearch(&foundX, &foundY, dotX1, dotY1, dotX2, dotY2, 0xFF0000, colorVariation)) {
+            ; 检查周围像素是否也是红色（确认是红点而不是噪点）
+            redCount := 0
             loop 10 {
-                if (PixelGetColor(foundX + A_Index - 5, foundY + A_Index - 5) ~= "0xFF0000") {
-                    redCount++
+                loop 10 {
+                    if (PixelGetColor(foundX + A_Index - 5, foundY + A_Index - 5) ~= "0xFF0000") {
+                        redCount++
+                    }
                 }
             }
+            return redCount >= 10  ; 如果周围有足够多的红色像素，认为是红点
         }
-        return redCount >= 10  ; 如果周围有足够多的红色像素，认为是红点
+        return false
+    } catch as err {
+        ToolTip("红点检测错误: " err.Message)
+        SetTimer(RemoveToolTip, -3000)
+        return false
     }
-    return false
 }
 
 ; ========== 分析区域状态 ==========
@@ -148,26 +191,33 @@ AnalyzeRegionState() {
     
     ; 遍历所有区域
     for regionKey, region in config["Regions"] {
-        ; 检测红点
-        hasRedDot := DetectRedDot(region)
-        redDotStates[regionKey] := hasRedDot
-        
-        ; 捕获并识别文本
-        imagePath := CaptureRegion(region)
-        text := PerformOCR(imagePath)
-        
-        ; 存储文本
-        regionTexts[regionKey] := text
-        
-        ; 分析状态
-        state := AnalyzeText(regionKey, text)
-        regionStates[regionKey] := state
-        
-        ; 显示状态
-        ToolTip("区域 [" region["name"] "] 状态: " state "`n"
-            . "文本: " text "`n"
-            . "红点: " (hasRedDot ? "有" : "无"))
-        SetTimer(RemoveToolTip, -1000)
+        try {
+            ; 检测红点
+            hasRedDot := DetectRedDot(region)
+            redDotStates[regionKey] := hasRedDot
+            
+            ; 捕获并识别文本
+            imagePath := CaptureRegion(region)
+            if (imagePath) {
+                text := PerformOCR(imagePath)
+                
+                ; 存储文本
+                regionTexts[regionKey] := text
+                
+                ; 分析状态
+                state := AnalyzeText(regionKey, text)
+                regionStates[regionKey] := state
+                
+                ; 显示状态
+                ToolTip("区域 [" region["name"] "] 状态: " state "`n"
+                    . "文本: " text "`n"
+                    . "红点: " (hasRedDot ? "有" : "无"))
+                SetTimer(RemoveToolTip, -1000)
+            }
+        } catch as err {
+            ToolTip("区域分析错误 [" region["name"] "]: " err.Message)
+            SetTimer(RemoveToolTip, -3000)
+        }
     }
 }
 
@@ -416,6 +466,9 @@ Main() {
     if (!CheckTesseract()) {
         return
     }
+    
+    ; 确保必要的目录存在
+    EnsureDirectories()
     
     ; 加载配置
     LoadConfig()
