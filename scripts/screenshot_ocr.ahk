@@ -241,33 +241,41 @@ CreateBitmap(width, height) {
 
 ; ========== 保存位图为PNG ==========
 SaveBitmapToFile(hBitmap, filename, width, height) {
+    pToken := 0
+    pBitmap := 0
+    
     try {
         ; 初始化GDI+
         pToken := Gdip_Startup()
+        LogMessage("GDI+初始化成功")
         
         ; 从HBITMAP创建GDI+位图
         pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
+        LogMessage("创建GDI+位图成功")
         
         ; 获取PNG编码器CLSID
         clsid := Gdip_GetEncoderClsid("image/png")
+        LogMessage("获取PNG编码器成功")
         
         ; 保存为PNG
         Gdip_SaveBitmapToFile(pBitmap, filename, clsid)
-        
-        ; 清理资源
-        Gdip_DisposeImage(pBitmap)
-        Gdip_Shutdown(pToken)
+        LogMessage("保存PNG文件成功")
         
         ; 验证文件是否创建成功
         if !FileExist(filename) {
             throw Error("文件创建失败: " filename)
         }
         
-        LogMessage("图片保存成功: " filename)
         return true
     } catch as err {
         LogMessage("保存位图失败: " err.Message, "ERROR")
         throw Error("保存位图失败: " err.Message)
+    } finally {
+        ; 清理资源
+        if pBitmap
+            Gdip_DisposeImage(pBitmap)
+        if pToken
+            Gdip_Shutdown(pToken)
     }
 }
 
@@ -680,25 +688,4 @@ F3:: {  ; 显示帮助
         . "1. 识别预定义的屏幕区域`n"
         . "2. 分析每个区域的文字内容`n"
         . "3. 根据分析结果执行相应操作`n`n"
-        . "配置说明：`n"
-        . "1. 在config/settings.ini中修改区域配置`n"
-        . "2. 可以调整区域坐标和大小`n"
-        . "3. 需要安装Tesseract OCR"
-    LogMessage("显示帮助信息")
-    MsgBox(helpMsg, "区域OCR脚本帮助")
-}
-
-; ========== 工具函数 ==========
-RemoveToolTip() {
-    ToolTip()
-}
-
-; ========== 退出处理 ==========
-ExitFunc(ExitReason, ExitCode) {
-    LogMessage("脚本退出，原因: " ExitReason)
-}
-
-OnExit(ExitFunc)
-
-; ========== 启动脚本 ==========
-Main() 
+        . "配置说明：`
