@@ -107,7 +107,7 @@ LoadConfig() {
 }
 
 ; ========== 截图函数 ==========
-CaptureRegion(region) {
+CaptureRegion(region, regionKey) {
     try {
         ; 获取目录路径
         dirs := EnsureDirectories()
@@ -147,8 +147,8 @@ CaptureRegion(region) {
             "TownRegion", "town"
         )
         
-        ; 获取英文名称，如果不存在则使用原始名称
-        namePrefix := regionName.Has(region["name"]) ? regionName[region["name"]] : region["name"]
+        ; 获取英文名称，如果不存在则使用区域键名
+        namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
         filename := imagesDir "\" namePrefix "_" timestamp ".png"
         
         ; 保存图片
@@ -240,7 +240,7 @@ AnalyzeRegionState() {
             redDotStates[regionKey] := hasRedDot
             
             ; 捕获并识别文本
-            imagePath := CaptureRegion(region)
+            imagePath := CaptureRegion(region, regionKey)
             if (imagePath) {
                 text := PerformOCR(imagePath)
                 
