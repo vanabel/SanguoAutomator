@@ -9,6 +9,7 @@ global config := Map()
 global regionStates := Map()  ; 存储区域状态
 global regionTexts := Map()   ; 存储区域文本
 global redDotStates := Map()  ; 存储红点状态
+global pToken := 0            ; GDI+ token
 
 ; 设置工作目录为项目根目录
 SetWorkingDir(A_ScriptDir "\..")
@@ -241,7 +242,7 @@ CreateBitmap(width, height) {
 
 ; ========== 保存位图为PNG ==========
 SaveBitmapToFile(hBitmap, filename, width, height) {
-    static pToken := 0
+    global pToken
     pBitmap := 0
     
     try {
@@ -703,8 +704,10 @@ RemoveToolTip() {
 ; ========== 退出处理 ==========
 ExitFunc(ExitReason, ExitCode) {
     global pToken
-    if pToken
+    if pToken {
         Gdip_Shutdown(pToken)
+        pToken := 0
+    }
     LogMessage("脚本退出，原因: " ExitReason)
 }
 
