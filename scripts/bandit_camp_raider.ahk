@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
+; 设置工作目录为脚本所在目录
+SetWorkingDir(A_ScriptDir)
+
 ; ========== 全局变量 ==========
 global isRunning := false
 global banditCampCoords := []
@@ -13,12 +16,12 @@ global banditCampInterval := 300000  ; 5分钟 = 300000毫秒
 LoadConfig() {
     try {
         ; 加载基本设置
-        maxBanditCampCount := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampLoops", "10"))
-        banditCampInterval := Integer(IniRead("config\settings.ini", "Tasks", "BanditCampWait", "300000"))
+        maxBanditCampCount := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditCampLoops", "10"))
+        banditCampInterval := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditCampWait", "300000"))
         
         ; 加载坐标点
         banditCampCoords := []
-        coordsStr := IniRead("config\settings.ini", "Tasks", "BanditCampCoords", "")
+        coordsStr := IniRead("..\config\settings.ini", "Tasks", "BanditCampCoords", "")
         if (coordsStr != "ERROR") {
             for coord in StrSplit(coordsStr, "|") {
                 parts := StrSplit(coord, ",")
@@ -172,7 +175,7 @@ Main() {
         LoadConfig()
         
         ; 如果配置了自动开始，则启动脚本
-        if (IniRead("config\settings.ini", "General", "AutoStart", "false") = "true") {
+        if (IniRead("..\config\settings.ini", "General", "AutoStart", "false") = "true") {
             isRunning := true
             LogMessage("自动开始已启用")
         }
