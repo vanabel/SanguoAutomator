@@ -1,6 +1,118 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
+; ========== GDI+ 函数 ==========
+Gdip_Startup() {
+    try {
+        if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+            DllCall("LoadLibrary", "str", "gdiplus")
+        
+        si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
+        NumPut("uint", 1, si)              ; GdiplusVersion = 1
+        if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0) {
+            throw Error("GdiplusStartup failed")
+        }
+        return pToken
+    } catch as err {
+        throw Error("GDI+ 初始化失败: " err.Message)
+    }
+}
+
+Gdip_Shutdown(pToken) {
+    try {
+        DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+        if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+            DllCall("FreeLibrary", "ptr", hModule)
+        return 0
+    } catch as err {
+        throw Error("GDI+ 关闭失败: " err.Message)
+    }
+}
+
+Gdip_GetEncoderClsid(sFormat) {
+    try {
+        ; 获取编码器数量
+        DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &nCount:=0, "uint*", &nSize:=0)
+        if !nCount || !nSize {
+            throw Error("无法获取编码器信息")
+        }
+        
+        ; 获取编码器信息
+        ci := Buffer(nSize)
+        DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, "ptr", ci)
+        
+        ; 查找指定格式的编码器
+        loop nCount {
+            ; 计算当前编码器信息的偏移量
+            offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
+            
+            ; 获取MIME类型字符串长度
+            mimeTypePtr := NumGet(ci, offset, "ptr")
+            if !mimeTypePtr
+                continue
+                
+            mimeTypeLen := DllCall("lstrlenW", "ptr", mimeTypePtr, "int")
+            if !mimeTypeLen
+                continue
+                
+            ; 创建缓冲区并复制MIME类型字符串
+            mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
+            DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", mimeTypePtr)
+            
+            ; 获取MIME类型字符串
+            mimeType := StrGet(mimeTypeBuf, "UTF-16")
+            
+            ; 对于PNG格式，尝试多种可能的MIME类型
+            if (sFormat = "image/png") {
+                if (mimeType = "image/png" || mimeType = "image/x-png" || mimeType = "png") {
+                    ; 返回CLSID指针
+                    return NumGet(ci, offset + 32, "ptr")
+                }
+            } else if (mimeType = sFormat) {
+                ; 返回CLSID指针
+                return NumGet(ci, offset + 32, "ptr")
+            }
+        }
+        
+        ; 如果找不到PNG编码器，尝试使用BMP编码器
+        if (sFormat = "image/png") {
+            ; 重新搜索BMP编码器
+            loop nCount {
+                offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
+                mimeTypePtr := NumGet(ci, offset, "ptr")
+                if !mimeTypePtr
+                    continue
+                    
+                mimeTypeLen := DllCall("lstrlenW", "ptr", mimeTypePtr, "int")
+                if !mimeTypeLen
+                    continue
+                    
+                mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
+                DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", mimeTypePtr)
+                mimeType := StrGet(mimeTypeBuf, "UTF-16")
+                
+                if (mimeType = "image/bmp" || mimeType = "image/x-ms-bmp" || mimeType = "bmp") {
+                    return NumGet(ci, offset + 32, "ptr")
+                }
+            }
+        }
+        
+        throw Error("未找到指定格式的编码器: " sFormat)
+    } catch as err {
+        throw Error("获取编码器失败: " err.Message)
+    }
+}
+
+Gdip_DisposeImage(pBitmap) {
+    try {
+        if !pBitmap
+            return 0
+        return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+    } catch as err {
+        throw Error("释放位图失败: " err.Message)
+    }
+}
+
 ; 设置工作目录为项目根目录
 SetWorkingDir(A_ScriptDir "\..")
 
