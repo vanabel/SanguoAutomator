@@ -50,16 +50,31 @@ LoadConfig() {
     
     ; 加载区域配置
     config["Regions"] := Map()
-    for section in IniRead("..\config\settings.ini", "Regions") {
-        value := IniRead("..\config\settings.ini", "Regions", section)
-        parts := StrSplit(value, ",")
-        config["Regions"][section] := Map(
-            "name", parts[1],
-            "x1", Integer(parts[2]),
-            "y1", Integer(parts[3]),
-            "x2", Integer(parts[4]),
-            "y2", Integer(parts[5])
-        )
+    
+    ; 读取所有区域配置
+    regions := IniRead("..\config\settings.ini", "Regions")
+    if (regions != "ERROR") {
+        for line in StrSplit(regions, "`n") {
+            if (line = "" || SubStr(line, 1, 1) = ";")
+                continue
+                
+            parts := StrSplit(line, "=")
+            if (parts.Length >= 2) {
+                section := Trim(parts[1])
+                value := Trim(parts[2])
+                valueParts := StrSplit(value, ",")
+                
+                if (valueParts.Length >= 5) {
+                    config["Regions"][section] := Map(
+                        "name", valueParts[1],
+                        "x1", Integer(valueParts[2]),
+                        "y1", Integer(valueParts[3]),
+                        "x2", Integer(valueParts[4]),
+                        "y2", Integer(valueParts[5])
+                    )
+                }
+            }
+        }
     }
     
     ; 显示加载的配置信息
