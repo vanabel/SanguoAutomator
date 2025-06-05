@@ -4,6 +4,13 @@
 ; 设置工作目录为脚本所在目录
 SetWorkingDir(A_ScriptDir)
 
+; ========== GDI+ 初始化 ==========
+#Include Gdip_All.ahk
+if !pToken := Gdip_Startup() {
+    MsgBox("GDI+ 初始化失败！")
+    ExitApp
+}
+
 ; ========== 全局变量 ==========
 global isRunning := false
 global config := Map()
@@ -458,6 +465,14 @@ F3:: {  ; 显示帮助
 RemoveToolTip() {
     ToolTip()
 }
+
+; ========== 退出处理 ==========
+ExitFunc(ExitReason, ExitCode) {
+    global pToken
+    Gdip_Shutdown(pToken)
+}
+
+OnExit(ExitFunc)
 
 ; ========== 启动脚本 ==========
 Main() 
