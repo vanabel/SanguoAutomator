@@ -92,7 +92,7 @@ RaidBanditCamp() {
         return
     }
     
-    ; 随机选择一个坐标
+    ; 检查坐标数组
     if (coords.Length = 0) {
         LogMessage("坐标点数组为空，重新加载配置")
         LoadConfig()
@@ -101,15 +101,18 @@ RaidBanditCamp() {
         }
     }
     
-    randomIndex := Random(1, coords.Length)
-    coord := coords[randomIndex]
-    
-    ; 点击坐标
-    Click(coord[1], coord[2])
-    LogMessage("点击山贼营寨坐标: " coord[1] ", " coord[2])
-    
-    ; 等待2秒后继续
-    Sleep(2000)
+    ; 遍历所有坐标点
+    for coord in coords {
+        if (!isRunning)
+            break
+            
+        ; 点击坐标
+        Click(coord[1], coord[2])
+        LogMessage("点击山贼营寨坐标: " coord[1] ", " coord[2])
+        
+        ; 等待2秒后继续
+        Sleep(2000)
+    }
     
     ; 更新计数和时间
     banditCampCount++
