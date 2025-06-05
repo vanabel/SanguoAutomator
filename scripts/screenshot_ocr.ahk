@@ -31,13 +31,6 @@ LogMessage(message, level := "INFO") {
     }
 }
 
-; ========== GDI+ 初始化 ==========
-#Include Gdip_All.ahk
-if !pToken := Gdip_Startup() {
-    LogMessage("GDI+ 初始化失败！", "ERROR")
-    ExitApp
-}
-
 ; ========== 全局变量 ==========
 global isRunning := false
 global config := Map()
@@ -149,17 +142,14 @@ CaptureRegion(region, regionKey) {
         dirs := EnsureDirectories()
         imagesDir := dirs["images"]
         
-        ; 创建截图对象
-        screenshot := Gdip_BitmapFromScreen(region["x1"] "|" region["y1"] "|" 
-            . (region["x2"] - region["x1"]) "|" (region["y2"] - region["y1"]))
-        
-        if !screenshot {
-            throw Error("截图失败 - 无法创建位图对象")
+        ; 确保目录存在
+        if !DirExist(imagesDir) {
+            DirCreate(imagesDir)
+            LogMessage("创建截图目录: " imagesDir)
         }
         
-        ; 保存截图
+        ; 生成文件名
         timestamp := FormatTime(, "yyyyMMdd_HHmmss")
-        ; 使用英文名称作为文件名前缀
         regionName := Map(
             "AvatarRegion", "avatar",
             "TitleRegion", "title",
@@ -187,34 +177,97 @@ CaptureRegion(region, regionKey) {
         namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
         filename := imagesDir "\" namePrefix "_" timestamp ".png"
         
-        ; 确保目录存在
-        if !DirExist(imagesDir) {
-            DirCreate(imagesDir)
-            LogMessage("创建截图目录: " imagesDir)
+        ; 使用Windows截图功能
+        try {
+            ; 创建临时位图
+            hBitmap := CreateBitmap(region["x2"] - region["x1"], region["y2"] - region["y1"])
+            if !hBitmap {
+                throw Error("创建位图失败")
+            }
+            
+            ; 获取屏幕DC
+            hdcScreen := DllCall("GetDC", "ptr", 0, "ptr")
+            if !hdcScreen {
+                throw Error("获取屏幕DC失败")
+            }
+            
+            ; 创建兼容DC
+            hdcMem := DllCall("CreateCompatibleDC", "ptr", hdcScreen, "ptr")
+            if !hdcMem {
+                throw Error("创建兼容DC失败")
+            }
+            
+            ; 选择位图到DC
+            hOldBitmap := DllCall("SelectObject", "ptr", hdcMem, "ptr", hBitmap, "ptr")
+            
+            ; 复制屏幕内容到位图
+            if !DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", region["x2"] - region["x1"], "int", region["y2"] - region["y1"], "ptr", hdcScreen, "int", region["x1"], "int", region["y1"], "uint", 0x00CC0020) {
+                throw Error("复制屏幕内容失败")
+            }
+            
+            ; 保存为PNG
+            if !SaveBitmapToFile(hBitmap, filename) {
+                throw Error("保存图片失败")
+            }
+            
+            ; 清理资源
+            DllCall("SelectObject", "ptr", hdcMem, "ptr", hOldBitmap)
+            DllCall("DeleteDC", "ptr", hdcMem)
+            DllCall("ReleaseDC", "ptr", 0, "ptr", hdcScreen)
+            DllCall("DeleteObject", "ptr", hBitmap)
+            
+            LogMessage("截图成功: " filename)
+            return filename
+        } catch as err {
+            throw Error("截图过程失败: " err.Message)
         }
-        
-        ; 保存图片
-        result := Gdip_SaveBitmapToFile(screenshot, filename)
-        if (result != 0) {
-            throw Error("保存图片失败，错误代码: " result "`n"
-                . "位图指针: " screenshot "`n"
-                . "文件路径: " filename "`n"
-                . "区域信息: " region["x1"] "," region["y1"] "," region["x2"] "," region["y2"])
-        }
-        
-        ; 验证文件是否成功创建
-        if !FileExist(filename) {
-            throw Error("文件创建失败: " filename)
-        }
-        
-        ; 释放资源
-        Gdip_DisposeImage(screenshot)
-        
-        LogMessage("截图成功: " filename)
-        return filename
     } catch as err {
         LogMessage("截图错误: " err.Message, "ERROR")
         return ""
+    }
+}
+
+; ========== 创建位图 ==========
+CreateBitmap(width, height) {
+    ; 创建位图
+    hBitmap := DllCall("CreateBitmap", "int", width, "int", height, "uint", 1, "uint", 32, "ptr", 0, "ptr")
+    if !hBitmap {
+        throw Error("CreateBitmap失败")
+    }
+    return hBitmap
+}
+
+; ========== 保存位图为PNG ==========
+SaveBitmapToFile(hBitmap, filename) {
+    try {
+        ; 初始化GDI+
+        if !pToken := Gdip_Startup() {
+            throw Error("GDI+初始化失败")
+        }
+        
+        ; 从HBITMAP创建GDI+位图
+        pBitmap := 0
+        if DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", 0, "ptr*", &pBitmap) {
+            throw Error("创建GDI+位图失败")
+        }
+        
+        ; 获取PNG编码器CLSID
+        if !CLSID := Gdip_GetEncoderClsid("image/png") {
+            throw Error("获取PNG编码器失败")
+        }
+        
+        ; 保存为PNG
+        if DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", filename, "ptr", CLSID, "ptr", 0) {
+            throw Error("保存图片失败")
+        }
+        
+        ; 清理资源
+        Gdip_DisposeImage(pBitmap)
+        Gdip_Shutdown(pToken)
+        
+        return true
+    } catch as err {
+        throw Error("保存位图失败: " err.Message)
     }
 }
 
