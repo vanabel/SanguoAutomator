@@ -24,13 +24,23 @@ CoordMode("Pixel", "Screen")
 
 ; ========== 检查并创建必要的目录 ==========
 EnsureDirectories() {
+    ; 获取脚本所在目录的绝对路径
+    scriptDir := A_ScriptDir
+    
     ; 创建images目录
-    if !DirExist("..\images")
-        DirCreate("..\images")
+    imagesDir := scriptDir "\..\images"
+    if !DirExist(imagesDir)
+        DirCreate(imagesDir)
     
     ; 创建临时目录
-    if !DirExist("..\temp")
-        DirCreate("..\temp")
+    tempDir := scriptDir "\..\temp"
+    if !DirExist(tempDir)
+        DirCreate(tempDir)
+        
+    return Map(
+        "images", imagesDir,
+        "temp", tempDir
+    )
 }
 
 ; ========== 检查Tesseract安装 ==========
@@ -99,6 +109,10 @@ LoadConfig() {
 ; ========== 截图函数 ==========
 CaptureRegion(region) {
     try {
+        ; 获取目录路径
+        dirs := EnsureDirectories()
+        imagesDir := dirs["images"]
+        
         ; 创建截图对象
         screenshot := Gdip_BitmapFromScreen(region["x1"] "|" region["y1"] "|" 
             . (region["x2"] - region["x1"]) "|" (region["y2"] - region["y1"]))
@@ -109,14 +123,17 @@ CaptureRegion(region) {
         
         ; 保存截图
         timestamp := FormatTime(, "yyyyMMdd_HHmmss")
-        filename := "..\images\" region["name"] "_" timestamp ".png"
-        
-        ; 确保目录存在
-        EnsureDirectories()
+        filename := imagesDir "\" region["name"] "_" timestamp ".png"
         
         ; 保存图片
-        if Gdip_SaveBitmapToFile(screenshot, filename) != 0 {
-            throw Error("保存图片失败")
+        result := Gdip_SaveBitmapToFile(screenshot, filename)
+        if (result != 0) {
+            throw Error("保存图片失败，错误代码: " result)
+        }
+        
+        ; 验证文件是否成功创建
+        if !FileExist(filename) {
+            throw Error("文件创建失败: " filename)
         }
         
         ; 释放资源
@@ -124,7 +141,7 @@ CaptureRegion(region) {
         
         return filename
     } catch as err {
-        ToolTip("截图错误: " err.Message)
+        ToolTip("截图错误: " err.Message "`n路径: " (filename ?? "未知"))
         SetTimer(RemoveToolTip, -3000)
         return ""
     }
