@@ -7,53 +7,78 @@
 
 ; ========== GDI+ 初始化 ==========
 Gdip_Startup() {
-    if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-        DllCall("LoadLibrary", "str", "gdiplus")
-    
-    si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
-    NumPut("uint", 1, si)              ; GdiplusVersion = 1
-    if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0)
-        return 0
-    return pToken
+    try {
+        if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+            DllCall("LoadLibrary", "str", "gdiplus")
+        
+        si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
+        NumPut("uint", 1, si)              ; GdiplusVersion = 1
+        if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0) {
+            throw Error("GdiplusStartup failed")
+        }
+        return pToken
+    } catch as err {
+        throw Error("GDI+ 初始化失败: " err.Message)
+    }
 }
 
 ; ========== GDI+ 关闭 ==========
 Gdip_Shutdown(pToken) {
-    DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
-    if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-        DllCall("FreeLibrary", "ptr", hModule)
-    return 0
+    try {
+        DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+        if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+            DllCall("FreeLibrary", "ptr", hModule)
+        return 0
+    } catch as err {
+        throw Error("GDI+ 关闭失败: " err.Message)
+    }
 }
 
 ; ========== 从屏幕创建位图 ==========
 Gdip_BitmapFromScreen(Area) {
-    if !Area
-        Area := "0|0|" A_ScreenWidth "|" A_ScreenHeight
-    
-    Area := StrSplit(Area, "|")
-    x := Area[1], y := Area[2], w := Area[3], h := Area[4]
-    
-    ; 创建屏幕DC
-    hdc := DllCall("GetDC", "ptr", 0, "ptr")
-    ; 创建兼容DC
-    hdc2 := DllCall("CreateCompatibleDC", "ptr", hdc, "ptr")
-    ; 创建位图
-    hbm := DllCall("CreateCompatibleBitmap", "ptr", hdc, "int", w, "int", h, "ptr")
-    ; 选择位图到DC
-    DllCall("SelectObject", "ptr", hdc2, "ptr", hbm)
-    ; 复制屏幕内容到位图
-    DllCall("BitBlt", "ptr", hdc2, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdc, "int", x, "int", y, "uint", 0x00CC0020)
-    
-    ; 创建GDI+位图
-    pBitmap := 0
-    DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hbm, "ptr", 0, "ptr*", &pBitmap)
-    
-    ; 清理
-    DllCall("DeleteObject", "ptr", hbm)
-    DllCall("DeleteDC", "ptr", hdc2)
-    DllCall("ReleaseDC", "ptr", 0, "ptr", hdc)
-    
-    return pBitmap
+    try {
+        if !Area
+            Area := "0|0|" A_ScreenWidth "|" A_ScreenHeight
+        
+        Area := StrSplit(Area, "|")
+        x := Area[1], y := Area[2], w := Area[3], h := Area[4]
+        
+        ; 创建屏幕DC
+        hdc := DllCall("GetDC", "ptr", 0, "ptr")
+        if !hdc
+            throw Error("GetDC failed")
+            
+        ; 创建兼容DC
+        hdc2 := DllCall("CreateCompatibleDC", "ptr", hdc, "ptr")
+        if !hdc2
+            throw Error("CreateCompatibleDC failed")
+            
+        ; 创建位图
+        hbm := DllCall("CreateCompatibleBitmap", "ptr", hdc, "int", w, "int", h, "ptr")
+        if !hbm
+            throw Error("CreateCompatibleBitmap failed")
+            
+        ; 选择位图到DC
+        DllCall("SelectObject", "ptr", hdc2, "ptr", hbm)
+        
+        ; 复制屏幕内容到位图
+        if !DllCall("BitBlt", "ptr", hdc2, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdc, "int", x, "int", y, "uint", 0x00CC0020)
+            throw Error("BitBlt failed")
+        
+        ; 创建GDI+位图
+        pBitmap := 0
+        if DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hbm, "ptr", 0, "ptr*", &pBitmap)
+            throw Error("GdipCreateBitmapFromHBITMAP failed")
+        
+        ; 清理
+        DllCall("DeleteObject", "ptr", hbm)
+        DllCall("DeleteDC", "ptr", hdc2)
+        DllCall("ReleaseDC", "ptr", 0, "ptr", hdc)
+        
+        return pBitmap
+    } catch as err {
+        throw Error("创建位图失败: " err.Message)
+    }
 }
 
 ; ========== 保存位图到文件 ==========
@@ -98,9 +123,7 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
         
         return 0
     } catch as err {
-        ToolTip("保存图片错误: " err.Message "`n路径: " sOutput)
-        SetTimer(RemoveToolTip, -3000)
-        return -1
+        throw Error("保存图片失败: " err.Message)
     }
 }
 
@@ -139,15 +162,19 @@ Gdip_GetEncoderClsid(sFormat) {
         }
         throw Error("未找到指定格式的编码器: " sFormat)
     } catch as err {
-        ToolTip("获取编码器错误: " err.Message)
-        SetTimer(RemoveToolTip, -3000)
-        return 0
+        throw Error("获取编码器失败: " err.Message)
     }
 }
 
 ; ========== 释放位图 ==========
 Gdip_DisposeImage(pBitmap) {
-    return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+    try {
+        if !pBitmap
+            return 0
+        return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+    } catch as err {
+        throw Error("释放位图失败: " err.Message)
+    }
 }
 
 ; ========== 工具函数 ==========

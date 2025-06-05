@@ -17,10 +17,10 @@ LogMessage(message, level := "INFO") {
         
         ; 格式化日志消息
         timestamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-        logMessage := timestamp " [" level "] " message "`n"
+        logMessage := timestamp " [" level "] " message "`r`n"
         
-        ; 写入日志文件
-        FileAppend(logMessage, logFile)
+        ; 写入日志文件（使用UTF-8编码）
+        FileAppend(logMessage, logFile, "UTF-8")
         
         ; 同时显示在工具提示中
         ToolTip(message)
@@ -154,7 +154,7 @@ CaptureRegion(region, regionKey) {
             . (region["x2"] - region["x1"]) "|" (region["y2"] - region["y1"]))
         
         if !screenshot {
-            throw Error("截图失败")
+            throw Error("截图失败 - 无法创建位图对象")
         }
         
         ; 保存截图
@@ -187,10 +187,19 @@ CaptureRegion(region, regionKey) {
         namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
         filename := imagesDir "\" namePrefix "_" timestamp ".png"
         
+        ; 确保目录存在
+        if !DirExist(imagesDir) {
+            DirCreate(imagesDir)
+            LogMessage("创建截图目录: " imagesDir)
+        }
+        
         ; 保存图片
         result := Gdip_SaveBitmapToFile(screenshot, filename)
         if (result != 0) {
-            throw Error("保存图片失败，错误代码: " result)
+            throw Error("保存图片失败，错误代码: " result "`n"
+                . "位图指针: " screenshot "`n"
+                . "文件路径: " filename "`n"
+                . "区域信息: " region["x1"] "," region["y1"] "," region["x2"] "," region["y2"])
         }
         
         ; 验证文件是否成功创建
@@ -204,7 +213,7 @@ CaptureRegion(region, regionKey) {
         LogMessage("截图成功: " filename)
         return filename
     } catch as err {
-        LogMessage("截图错误: " err.Message "`n路径: " (filename ?? "未知"), "ERROR")
+        LogMessage("截图错误: " err.Message, "ERROR")
         return ""
     }
 }
