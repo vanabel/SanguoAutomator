@@ -23,8 +23,8 @@ LoadConfig() {
     config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
     
     ; 加载刷流寇任务配置
-    totalLoops := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditLoops", "10"))
-    coords := ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800"))
+    totalLoops := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditRaidLoops", "10"))
+    coords := ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditRaidCoords", "890,533|1077,649|1078,348|1067,800"))
     
     ; 显示加载的配置信息
     ToolTip("配置已加载：`n"

@@ -27,11 +27,19 @@ LoadConfig() {
     config["Tasks"] := Map()
     
     ; 刷流寇任务
-    config["Tasks"]["Bandit"] := Map(
-        "name", IniRead("..\config\settings.ini", "Tasks", "BanditName", "刷流寇"),
-        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditCoords", "890,533|1077,649|1078,348|1067,800")),
-        "wait", IniRead("..\config\settings.ini", "Tasks", "BanditWait", "52000"),
-        "loop", IniRead("..\config\settings.ini", "Tasks", "BanditLoops", "10")
+    config["Tasks"]["BanditRaid"] := Map(
+        "name", IniRead("..\config\settings.ini", "Tasks", "BanditRaidName", "刷流寇"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditRaidCoords", "890,533|1077,649|1078,348|1067,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "BanditRaidWait", "52000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "BanditRaidLoops", "10")
+    )
+    
+    ; 山贼营寨任务
+    config["Tasks"]["BanditCamp"] := Map(
+        "name", IniRead("..\config\settings.ini", "Tasks", "BanditCampName", "山贼营寨"),
+        "coords", ParseCoords(IniRead("..\config\settings.ini", "Tasks", "BanditCampCoords", "890,537|990,750|1070,650|1070,350|1070,600|1070,800")),
+        "wait", IniRead("..\config\settings.ini", "Tasks", "BanditCampWait", "300000"),
+        "loop", IniRead("..\config\settings.ini", "Tasks", "BanditCampLoops", "10")
     )
     
     ; 采集任务
@@ -93,7 +101,8 @@ Main() {
     
     ; 构建任务队列
     taskQueue := [
-        config["Tasks"]["Bandit"],
+        config["Tasks"]["BanditRaid"],
+        config["Tasks"]["BanditCamp"],
         config["Tasks"]["CollectMeat"],
         config["Tasks"]["CollectWood"],
         config["Tasks"]["CollectCoal"],

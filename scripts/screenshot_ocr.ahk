@@ -200,10 +200,24 @@ CaptureRegion(region, regionKey) {
                     . "下载地址: https://github.com/vanabel/GameAutomator/releases/download/v1.0.0/PrScrn.dll")
             }
             
+            ; 检查系统架构
+            is64Bit := A_PtrSize = 8
+            LogMessage("系统架构: " (is64Bit ? "64位" : "32位"))
+            
             ; 加载PrScrn.dll
             hPrScrn := DllCall("LoadLibrary", "str", dllPath, "ptr")
             if !hPrScrn {
-                throw Error("加载PrScrn.dll失败，错误代码: " A_LastError)
+                errorCode := A_LastError
+                errorMsg := ""
+                switch errorCode {
+                    case 193:
+                        errorMsg := "DLL架构不匹配。请确保使用" (is64Bit ? "64位" : "32位") "版本的PrScrn.dll"
+                    case 126:
+                        errorMsg := "DLL依赖项缺失。请确保所有必要的DLL都已安装"
+                    default:
+                        errorMsg := "未知错误"
+                }
+                throw Error("加载PrScrn.dll失败，错误代码: " errorCode " (" errorMsg ")")
             }
             
             ; 初始化GDI+
