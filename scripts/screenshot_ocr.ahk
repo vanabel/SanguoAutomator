@@ -1,6 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
+#Include Gdip_All.ahk
+
 ; ========== 全局变量 ==========
 global isRunning := false
 global config := Map()
@@ -171,7 +173,7 @@ CaptureRegion(region, regionKey) {
         
         ; 获取英文名称，如果不存在则使用区域键名
         namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
-        filename := imagesDir "\" namePrefix "_" timestamp ".bmp"  ; 使用BMP格式
+        filename := imagesDir "\" namePrefix "_" timestamp ".png"  ; 使用PNG格式
         
         ; 计算区域大小
         width := region["x2"] - region["x1"]
@@ -205,7 +207,7 @@ CaptureRegion(region, regionKey) {
                 throw Error("复制屏幕内容失败")
             }
             
-            ; 保存为BMP
+            ; 保存为PNG
             if !SaveBitmapToFile(hBitmap, filename, width, height) {
                 throw Error("保存图片失败")
             }
@@ -237,59 +239,24 @@ CreateBitmap(width, height) {
     return hBitmap
 }
 
-; ========== 保存位图为BMP ==========
+; ========== 保存位图为PNG ==========
 SaveBitmapToFile(hBitmap, filename, width, height) {
     try {
-        ; 创建位图信息头
-        bi := Buffer(40, 0)  ; sizeof(BITMAPINFOHEADER) = 40
-        NumPut("uint", 40, bi, 0)           ; biSize
-        NumPut("uint", width, bi, 4)        ; biWidth
-        NumPut("uint", -height, bi, 8)      ; biHeight (负值表示自上而下)
-        NumPut("ushort", 1, bi, 12)         ; biPlanes
-        NumPut("ushort", 32, bi, 14)        ; biBitCount
-        NumPut("uint", 0, bi, 16)           ; biCompression
-        NumPut("uint", 0, bi, 20)           ; biSizeImage
-        NumPut("uint", 0, bi, 24)           ; biXPelsPerMeter
-        NumPut("uint", 0, bi, 28)           ; biYPelsPerMeter
-        NumPut("uint", 0, bi, 32)           ; biClrUsed
-        NumPut("uint", 0, bi, 36)           ; biClrImportant
+        ; 初始化GDI+
+        pToken := Gdip_Startup()
         
-        ; 创建文件
-        file := FileOpen(filename, "w")
-        if !file {
-            throw Error("无法创建文件: " filename)
-        }
+        ; 从HBITMAP创建GDI+位图
+        pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
         
-        ; 写入BMP文件头
-        file.WriteUInt(0x4D42)              ; 签名 "BM"
-        file.WriteUInt(54 + width * height * 4)  ; 文件大小
-        file.WriteUInt(0)                   ; 保留
-        file.WriteUInt(54)                  ; 位图数据偏移
-        file.Write(bi)                      ; 位图信息头
+        ; 获取PNG编码器CLSID
+        clsid := Gdip_GetEncoderClsid("image/png")
         
-        ; 获取位图数据
-        hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
-        if !hdc {
-            throw Error("创建DC失败")
-        }
-        
-        DllCall("SelectObject", "ptr", hdc, "ptr", hBitmap)
-        
-        ; 分配内存
-        size := width * height * 4
-        pBits := Buffer(size, 0)
-        
-        ; 获取位图数据
-        if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", height, "ptr", pBits, "ptr", bi, "uint", 0) {
-            throw Error("获取位图数据失败")
-        }
-        
-        ; 写入位图数据
-        file.RawWrite(pBits, size)
+        ; 保存为PNG
+        Gdip_SaveBitmapToFile(pBitmap, filename, clsid)
         
         ; 清理资源
-        DllCall("DeleteDC", "ptr", hdc)
-        file.Close()
+        Gdip_DisposeImage(pBitmap)
+        Gdip_Shutdown(pToken)
         
         ; 验证文件是否创建成功
         if !FileExist(filename) {

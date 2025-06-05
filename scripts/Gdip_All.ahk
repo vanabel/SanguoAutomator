@@ -1,184 +1,66 @@
 #Requires AutoHotkey v2.0
 
-; ========== GDI+ 函数库 ==========
-; 作者: mmikeww
-; 版本: 1.0.0
-; 描述: GDI+ 函数库，用于截图和图像处理
-
-; ========== GDI+ 初始化 ==========
+; ========== GDI+ Functions ==========
 Gdip_Startup() {
-    try {
-        if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-            DllCall("LoadLibrary", "str", "gdiplus")
-        
-        si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
-        NumPut("uint", 1, si)              ; GdiplusVersion = 1
-        if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0) {
-            throw Error("GdiplusStartup failed")
-        }
-        return pToken
-    } catch as err {
-        throw Error("GDI+ 初始化失败: " err.Message)
-    }
+    if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+        DllCall("LoadLibrary", "str", "gdiplus")
+    
+    si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
+    NumPut("uint", 1, si)              ; GdiplusVersion = 1
+    
+    if !DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0)
+        throw Error("GDI+初始化失败")
+    
+    return pToken
 }
 
-; ========== GDI+ 关闭 ==========
 Gdip_Shutdown(pToken) {
-    try {
-        DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
-        if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-            DllCall("FreeLibrary", "ptr", hModule)
-        return 0
-    } catch as err {
-        throw Error("GDI+ 关闭失败: " err.Message)
-    }
+    DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+    if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+        DllCall("FreeLibrary", "ptr", hModule)
 }
 
-; ========== 从屏幕创建位图 ==========
-Gdip_BitmapFromScreen(Area) {
-    try {
-        if !Area
-            Area := "0|0|" A_ScreenWidth "|" A_ScreenHeight
-        
-        Area := StrSplit(Area, "|")
-        x := Area[1], y := Area[2], w := Area[3], h := Area[4]
-        
-        ; 创建屏幕DC
-        hdc := DllCall("GetDC", "ptr", 0, "ptr")
-        if !hdc
-            throw Error("GetDC failed")
-            
-        ; 创建兼容DC
-        hdc2 := DllCall("CreateCompatibleDC", "ptr", hdc, "ptr")
-        if !hdc2
-            throw Error("CreateCompatibleDC failed")
-            
-        ; 创建位图
-        hbm := DllCall("CreateCompatibleBitmap", "ptr", hdc, "int", w, "int", h, "ptr")
-        if !hbm
-            throw Error("CreateCompatibleBitmap failed")
-            
-        ; 选择位图到DC
-        DllCall("SelectObject", "ptr", hdc2, "ptr", hbm)
-        
-        ; 复制屏幕内容到位图
-        if !DllCall("BitBlt", "ptr", hdc2, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdc, "int", x, "int", y, "uint", 0x00CC0020)
-            throw Error("BitBlt failed")
-        
-        ; 创建GDI+位图
-        pBitmap := 0
-        if DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hbm, "ptr", 0, "ptr*", &pBitmap)
-            throw Error("GdipCreateBitmapFromHBITMAP failed")
-        
-        ; 清理
-        DllCall("DeleteObject", "ptr", hbm)
-        DllCall("DeleteDC", "ptr", hdc2)
-        DllCall("ReleaseDC", "ptr", 0, "ptr", hdc)
-        
-        return pBitmap
-    } catch as err {
-        throw Error("创建位图失败: " err.Message)
+Gdip_GetEncoderClsid(format) {
+    ; 获取编码器CLSID
+    if !DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &numEncoders:=0, "uint*", &size:=0)
+        throw Error("获取编码器大小失败")
+    
+    encoders := Buffer(size)
+    if !DllCall("gdiplus\GdipGetImageEncoders", "uint", numEncoders, "uint", size, "ptr", encoders)
+        throw Error("获取编码器失败")
+    
+    ; 查找指定格式的编码器
+    loop numEncoders {
+        encoder := encoders + (A_Index - 1) * 76  ; sizeof(ImageCodecInfo) = 76
+        if (StrGet(NumGet(encoder + 32, "ptr"), "UTF-16") = format) {
+            clsid := Buffer(16, 0)
+            DllCall("RtlMoveMemory", "ptr", clsid, "ptr", encoder, "ptr", 16)
+            return clsid
+        }
     }
+    throw Error("未找到指定格式的编码器: " format)
 }
 
-; ========== 保存位图到文件 ==========
-Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
-    try {
-        ; 检查参数
-        if !pBitmap {
-            throw Error("无效的位图指针")
-        }
-        
-        if !sOutput {
-            throw Error("无效的输出路径")
-        }
-        
-        ; 确保目录存在
-        dir := DirName(sOutput)
-        if !DirExist(dir)
-            DirCreate(dir)
-        
-        ; 获取编码器CLSID
-        if !CLSID := Gdip_GetEncoderClsid("image/png") {
-            throw Error("无法获取PNG编码器")
-        }
-        
-        ; 创建编码器参数
-        ep := Buffer(24+2*A_PtrSize, 0)
-        NumPut("uint", 1, ep, 0)           ; 参数数量
-        NumPut("uint", 1, ep, 16)          ; 参数类型 (EncoderParameterValueTypeLong = 1)
-        NumPut("uint", 1, ep, 20)          ; 参数值数量
-        NumPut("uint", Quality, ep, 24)     ; 质量值
-        
-        ; 保存位图
-        E := DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", sOutput, "ptr", CLSID, "ptr", ep)
-        if (E != 0) {
-            throw Error("GdipSaveImageToFile 失败，错误代码: " E)
-        }
-        
-        ; 验证文件是否创建成功
-        if !FileExist(sOutput) {
-            throw Error("文件创建失败: " sOutput)
-        }
-        
-        return 0
-    } catch as err {
-        throw Error("保存图片失败: " err.Message)
-    }
+Gdip_SaveBitmapToFile(pBitmap, sOutput, clsid, quality:=75) {
+    ; 创建编码器参数
+    ep := Buffer(24 + A_PtrSize, 0)     ; sizeof(EncoderParameters) = 24 + A_PtrSize
+    NumPut("uint", 1, ep, 0)            ; Count
+    NumPut("uint", 1, ep, 16)           ; Type
+    NumPut("uint", quality, ep, 20)     ; Value
+    
+    ; 保存图片
+    if !DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", sOutput, "ptr", clsid, "ptr", ep)
+        throw Error("保存图片失败")
+    
+    return true
 }
 
-; ========== 获取编码器CLSID ==========
-Gdip_GetEncoderClsid(sFormat) {
-    try {
-        ; 获取编码器数量
-        DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &nCount:=0, "uint*", &nSize:=0)
-        if !nCount || !nSize {
-            throw Error("无法获取编码器信息")
-        }
-        
-        ; 获取编码器信息
-        ci := Buffer(nSize)
-        DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, "ptr", ci)
-        
-        ; 查找指定格式的编码器
-        loop nCount {
-            ; 计算当前编码器信息的偏移量
-            offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
-            
-            ; 获取MIME类型字符串长度
-            mimeTypeLen := DllCall("lstrlenW", "ptr", NumGet(ci, offset, "ptr"), "int")
-            if !mimeTypeLen
-                continue
-                
-            ; 创建缓冲区并复制MIME类型字符串
-            mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
-            DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", NumGet(ci, offset, "ptr"))
-            
-            ; 比较MIME类型
-            if (StrGet(mimeTypeBuf, "UTF-16") = sFormat) {
-                ; 返回CLSID指针
-                return NumGet(ci, offset + 32, "ptr")
-            }
-        }
-        throw Error("未找到指定格式的编码器: " sFormat)
-    } catch as err {
-        throw Error("获取编码器失败: " err.Message)
-    }
+Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
+    if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", hPalette, "ptr*", &pBitmap:=0)
+        throw Error("从HBITMAP创建位图失败")
+    return pBitmap
 }
 
-; ========== 释放位图 ==========
 Gdip_DisposeImage(pBitmap) {
-    try {
-        if !pBitmap
-            return 0
-        return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
-    } catch as err {
-        throw Error("释放位图失败: " err.Message)
-    }
-}
-
-; ========== 工具函数 ==========
-DirName(path) {
-    SplitPath(path, , &dir)
-    return dir
+    return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
 } 
