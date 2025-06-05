@@ -87,8 +87,19 @@ Gdip_GetEncoderClsid(sFormat) {
     
     ; 查找指定格式的编码器
     loop nCount {
-        if (StrGet(NumGet(ci, (idx:=(48+7*A_PtrSize)*(A_Index-1)), "ptr"), "UTF-16") = sFormat) {
-            return NumGet(ci, idx+32, "ptr")
+        ; 计算当前编码器信息的偏移量
+        offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
+        
+        ; 获取MIME类型字符串指针
+        mimeTypePtr := NumGet(ci, offset, "ptr")
+        if !mimeTypePtr
+            continue
+            
+        ; 读取MIME类型字符串
+        mimeType := StrGet(mimeTypePtr, "UTF-16")
+        if (mimeType = sFormat) {
+            ; 返回CLSID指针
+            return NumGet(ci, offset + 32, "ptr")
         }
     }
     return 0
