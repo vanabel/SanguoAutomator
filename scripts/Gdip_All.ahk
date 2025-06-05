@@ -2,6 +2,12 @@
 
 ; ========== GDI+ Functions ==========
 Gdip_Startup() {
+    static pToken := 0
+    
+    ; 如果已经初始化，直接返回token
+    if pToken
+        return pToken
+    
     ; 加载GDI+库
     if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
         DllCall("LoadLibrary", "str", "gdiplus")
@@ -14,17 +20,30 @@ Gdip_Startup() {
     NumPut("int", 0, si, 20)           ; SuppressExternalCodecs = 0
     
     ; 启动GDI+
-    if !DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0)
+    if !DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken, "ptr", si, "ptr", 0) {
+        if (A_LastError = 183) {  ; ERROR_ALREADY_EXISTS
+            ; 尝试获取已存在的token
+            if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken, "ptr", si, "ptr", 0)
+                return pToken
+        }
         throw Error("GDI+初始化失败: " A_LastError)
+    }
     
     return pToken
 }
 
 Gdip_Shutdown(pToken) {
+    static shutdownCount := 0
+    
     if pToken {
-        DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
-        if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-            DllCall("FreeLibrary", "ptr", hModule)
+        shutdownCount++
+        ; 只在最后一次调用时真正关闭GDI+
+        if (shutdownCount >= 1) {
+            DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+            if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+                DllCall("FreeLibrary", "ptr", hModule)
+            shutdownCount := 0
+        }
     }
 }
 

@@ -241,12 +241,13 @@ CreateBitmap(width, height) {
 
 ; ========== 保存位图为PNG ==========
 SaveBitmapToFile(hBitmap, filename, width, height) {
-    pToken := 0
+    static pToken := 0
     pBitmap := 0
     
     try {
         ; 初始化GDI+
-        pToken := Gdip_Startup()
+        if !pToken
+            pToken := Gdip_Startup()
         LogMessage("GDI+初始化成功")
         
         ; 从HBITMAP创建GDI+位图
@@ -274,8 +275,6 @@ SaveBitmapToFile(hBitmap, filename, width, height) {
         ; 清理资源
         if pBitmap
             Gdip_DisposeImage(pBitmap)
-        if pToken
-            Gdip_Shutdown(pToken)
     }
 }
 
@@ -703,6 +702,9 @@ RemoveToolTip() {
 
 ; ========== 退出处理 ==========
 ExitFunc(ExitReason, ExitCode) {
+    global pToken
+    if pToken
+        Gdip_Shutdown(pToken)
     LogMessage("脚本退出，原因: " ExitReason)
 }
 
