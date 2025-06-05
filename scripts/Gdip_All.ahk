@@ -1,3 +1,5 @@
+#Requires AutoHotkey v2.0
+
 ; ========== GDI+ 函数库 ==========
 ; 作者: mmikeww
 ; 版本: 1.0.0

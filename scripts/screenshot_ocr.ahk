@@ -27,7 +27,7 @@ CheckTesseract() {
     try {
         RunWait('tesseract --version', , "Hide")
         return true
-    } catch {
+    } catch as err {
         MsgBox("未检测到Tesseract OCR！`n`n"
             . "请按照以下步骤安装：`n"
             . "1. 访问 https://github.com/UB-Mannheim/tesseract/wiki`n"
@@ -490,5 +490,4 @@ ExitFunc(ExitReason, ExitCode) {
 OnExit(ExitFunc)
 
 ; ========== 启动脚本 ==========
-Main() 
 Main() 
