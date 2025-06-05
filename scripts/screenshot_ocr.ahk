@@ -180,44 +180,30 @@ CaptureRegion(region, regionKey) {
         width := region["x2"] - region["x1"]
         height := region["y2"] - region["y1"]
         
-        ; 使用Windows截图功能
+        ; 使用TXGYMailCamera.dll进行截图
         try {
-            ; 创建临时位图
-            hBitmap := CreateBitmap(width, height)
-            if !hBitmap {
-                throw Error("创建位图失败")
+            ; 加载DLL
+            if !DllCall("LoadLibrary", "str", "TXGYMailCamera.dll") {
+                throw Error("加载TXGYMailCamera.dll失败")
             }
             
-            ; 获取屏幕DC
-            hdcScreen := DllCall("GetDC", "ptr", 0, "ptr")
-            if !hdcScreen {
-                throw Error("获取屏幕DC失败")
+            ; 调用截图函数
+            result := DllCall("TXGYMailCamera.dll\CaptureScreen", 
+                "int", region["x1"],  ; 起始X坐标
+                "int", region["y1"],  ; 起始Y坐标
+                "int", width,         ; 宽度
+                "int", height,        ; 高度
+                "str", filename,      ; 输出文件路径
+                "int")               ; 返回值
+            
+            if (result != 1) {
+                throw Error("截图失败，错误代码: " result)
             }
             
-            ; 创建兼容DC
-            hdcMem := DllCall("CreateCompatibleDC", "ptr", hdcScreen, "ptr")
-            if !hdcMem {
-                throw Error("创建兼容DC失败")
+            ; 验证文件是否创建成功
+            if !FileExist(filename) {
+                throw Error("文件创建失败: " filename)
             }
-            
-            ; 选择位图到DC
-            hOldBitmap := DllCall("SelectObject", "ptr", hdcMem, "ptr", hBitmap, "ptr")
-            
-            ; 复制屏幕内容到位图
-            if !DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", width, "int", height, "ptr", hdcScreen, "int", region["x1"], "int", region["y1"], "uint", 0x00CC0020) {
-                throw Error("复制屏幕内容失败")
-            }
-            
-            ; 保存为PNG
-            if !SaveBitmapToFile(hBitmap, filename, width, height) {
-                throw Error("保存图片失败")
-            }
-            
-            ; 清理资源
-            DllCall("SelectObject", "ptr", hdcMem, "ptr", hOldBitmap)
-            DllCall("DeleteDC", "ptr", hdcMem)
-            DllCall("ReleaseDC", "ptr", 0, "ptr", hdcScreen)
-            DllCall("DeleteObject", "ptr", hBitmap)
             
             LogMessage("截图成功: " filename)
             return filename
@@ -227,55 +213,6 @@ CaptureRegion(region, regionKey) {
     } catch as err {
         LogMessage("截图错误: " err.Message, "ERROR")
         return ""
-    }
-}
-
-; ========== 创建位图 ==========
-CreateBitmap(width, height) {
-    ; 创建位图
-    hBitmap := DllCall("CreateBitmap", "int", width, "int", height, "uint", 1, "uint", 32, "ptr", 0, "ptr")
-    if !hBitmap {
-        throw Error("CreateBitmap失败")
-    }
-    return hBitmap
-}
-
-; ========== 保存位图为PNG ==========
-SaveBitmapToFile(hBitmap, filename, width, height) {
-    global pToken
-    pBitmap := 0
-    
-    try {
-        ; 初始化GDI+
-        if !pToken
-            pToken := Gdip_Startup()
-        LogMessage("GDI+初始化成功")
-        
-        ; 从HBITMAP创建GDI+位图
-        pBitmap := Gdip_CreateBitmapFromHBITMAP(hBitmap)
-        LogMessage("创建GDI+位图成功")
-        
-        ; 获取PNG编码器CLSID
-        clsid := Gdip_GetEncoderClsid("image/png")
-        LogMessage("获取PNG编码器成功")
-        
-        ; 保存为PNG
-        Gdip_SaveBitmapToFile(pBitmap, filename, clsid)
-        LogMessage("保存PNG文件成功")
-        
-        ; 验证文件是否创建成功
-        if !FileExist(filename) {
-            throw Error("文件创建失败: " filename)
-        }
-        
-        return true
-    } catch as err {
-        LogMessage("保存位图失败: " err.Message, "ERROR")
-        throw Error("保存位图失败: " err.Message)
-    } finally {
-        ; 清理资源
-        if pBitmap
-            Gdip_DisposeImage(pBitmap)
     }
 }
 
@@ -703,11 +640,8 @@ RemoveToolTip() {
 
 ; ========== 退出处理 ==========
 ExitFunc(ExitReason, ExitCode) {
-    global pToken
-    if pToken {
-        Gdip_Shutdown(pToken)
-        pToken := 0
-    }
+    ; 卸载DLL
+    DllCall("FreeLibrary", "ptr", DllCall("GetModuleHandle", "str", "TXGYMailCamera.dll", "ptr"))
     LogMessage("脚本退出，原因: " ExitReason)
 }
 
