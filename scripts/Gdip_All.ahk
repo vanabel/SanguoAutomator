@@ -58,57 +58,100 @@ Gdip_BitmapFromScreen(Area) {
 
 ; ========== 保存位图到文件 ==========
 Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality:=75) {
-    ; 获取编码器CLSID
-    if !CLSID := Gdip_GetEncoderClsid("image/png")
+    try {
+        ; 检查参数
+        if !pBitmap {
+            throw Error("无效的位图指针")
+        }
+        
+        if !sOutput {
+            throw Error("无效的输出路径")
+        }
+        
+        ; 确保目录存在
+        dir := DirName(sOutput)
+        if !DirExist(dir)
+            DirCreate(dir)
+        
+        ; 获取编码器CLSID
+        if !CLSID := Gdip_GetEncoderClsid("image/png") {
+            throw Error("无法获取PNG编码器")
+        }
+        
+        ; 创建编码器参数
+        ep := Buffer(24+2*A_PtrSize, 0)
+        NumPut("uint", 1, ep, 0)           ; 参数数量
+        NumPut("uint", 1, ep, 16)          ; 参数类型 (EncoderParameterValueTypeLong = 1)
+        NumPut("uint", 1, ep, 20)          ; 参数值数量
+        NumPut("uint", Quality, ep, 24)     ; 质量值
+        
+        ; 保存位图
+        E := DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", sOutput, "ptr", CLSID, "ptr", ep)
+        if (E != 0) {
+            throw Error("GdipSaveImageToFile 失败，错误代码: " E)
+        }
+        
+        ; 验证文件是否创建成功
+        if !FileExist(sOutput) {
+            throw Error("文件创建失败: " sOutput)
+        }
+        
+        return 0
+    } catch as err {
+        ToolTip("保存图片错误: " err.Message "`n路径: " sOutput)
+        SetTimer(RemoveToolTip, -3000)
         return -1
-    
-    ; 创建编码器参数
-    ep := Buffer(24+2*A_PtrSize, 0)
-    NumPut("uint", 1, ep, 0)           ; 参数数量
-    NumPut("uint", 1, ep, 16)          ; 参数类型 (EncoderParameterValueTypeLong = 1)
-    NumPut("uint", 1, ep, 20)          ; 参数值数量
-    NumPut("uint", Quality, ep, 24)     ; 质量值
-    
-    ; 保存位图
-    E := DllCall("gdiplus\GdipSaveImageToFile", "ptr", pBitmap, "str", sOutput, "ptr", CLSID, "ptr", ep)
-    return E
+    }
 }
 
 ; ========== 获取编码器CLSID ==========
 Gdip_GetEncoderClsid(sFormat) {
-    ; 获取编码器数量
-    DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &nCount:=0, "uint*", &nSize:=0)
-    if !nCount || !nSize
-        return 0
-    
-    ; 获取编码器信息
-    ci := Buffer(nSize)
-    DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, "ptr", ci)
-    
-    ; 查找指定格式的编码器
-    loop nCount {
-        ; 计算当前编码器信息的偏移量
-        offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
-        
-        ; 获取MIME类型字符串长度
-        mimeTypeLen := DllCall("lstrlenW", "ptr", NumGet(ci, offset, "ptr"), "int")
-        if !mimeTypeLen
-            continue
-            
-        ; 创建缓冲区并复制MIME类型字符串
-        mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
-        DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", NumGet(ci, offset, "ptr"))
-        
-        ; 比较MIME类型
-        if (StrGet(mimeTypeBuf, "UTF-16") = sFormat) {
-            ; 返回CLSID指针
-            return NumGet(ci, offset + 32, "ptr")
+    try {
+        ; 获取编码器数量
+        DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &nCount:=0, "uint*", &nSize:=0)
+        if !nCount || !nSize {
+            throw Error("无法获取编码器信息")
         }
+        
+        ; 获取编码器信息
+        ci := Buffer(nSize)
+        DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, "ptr", ci)
+        
+        ; 查找指定格式的编码器
+        loop nCount {
+            ; 计算当前编码器信息的偏移量
+            offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
+            
+            ; 获取MIME类型字符串长度
+            mimeTypeLen := DllCall("lstrlenW", "ptr", NumGet(ci, offset, "ptr"), "int")
+            if !mimeTypeLen
+                continue
+                
+            ; 创建缓冲区并复制MIME类型字符串
+            mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
+            DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", NumGet(ci, offset, "ptr"))
+            
+            ; 比较MIME类型
+            if (StrGet(mimeTypeBuf, "UTF-16") = sFormat) {
+                ; 返回CLSID指针
+                return NumGet(ci, offset + 32, "ptr")
+            }
+        }
+        throw Error("未找到指定格式的编码器: " sFormat)
+    } catch as err {
+        ToolTip("获取编码器错误: " err.Message)
+        SetTimer(RemoveToolTip, -3000)
+        return 0
     }
-    return 0
 }
 
 ; ========== 释放位图 ==========
 Gdip_DisposeImage(pBitmap) {
     return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+}
+
+; ========== 工具函数 ==========
+DirName(path) {
+    SplitPath(path, , &dir)
+    return dir
 } 
