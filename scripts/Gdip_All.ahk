@@ -90,14 +90,17 @@ Gdip_GetEncoderClsid(sFormat) {
         ; 计算当前编码器信息的偏移量
         offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
         
-        ; 获取MIME类型字符串指针
-        mimeTypePtr := NumGet(ci, offset, "ptr")
-        if !mimeTypePtr
+        ; 获取MIME类型字符串长度
+        mimeTypeLen := DllCall("lstrlenW", "ptr", NumGet(ci, offset, "ptr"), "int")
+        if !mimeTypeLen
             continue
             
-        ; 读取MIME类型字符串
-        mimeType := StrGet(mimeTypePtr, "UTF-16")
-        if (mimeType = sFormat) {
+        ; 创建缓冲区并复制MIME类型字符串
+        mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
+        DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", NumGet(ci, offset, "ptr"))
+        
+        ; 比较MIME类型
+        if (StrGet(mimeTypeBuf, "UTF-16") = sFormat) {
             ; 返回CLSID指针
             return NumGet(ci, offset + 32, "ptr")
         }
