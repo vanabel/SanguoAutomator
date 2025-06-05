@@ -1,14 +1,14 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; 设置工作目录为脚本所在目录
-SetWorkingDir(A_ScriptDir)
+; 设置工作目录为项目根目录
+SetWorkingDir(A_ScriptDir "\..")
 
 ; ========== 日志函数 ==========
 LogMessage(message, level := "INFO") {
     try {
         ; 获取日志目录
-        logDir := A_ScriptDir "\..\logs"
+        logDir := "logs"
         if !DirExist(logDir)
             DirCreate(logDir)
             
@@ -52,18 +52,15 @@ CoordMode("Pixel", "Screen")
 ; ========== 检查并创建必要的目录 ==========
 EnsureDirectories() {
     try {
-        ; 获取脚本所在目录的绝对路径
-        scriptDir := A_ScriptDir
-        
         ; 创建images目录
-        imagesDir := scriptDir "\..\images"
+        imagesDir := "images"
         if !DirExist(imagesDir) {
             DirCreate(imagesDir)
             LogMessage("创建截图目录: " imagesDir)
         }
         
         ; 创建临时目录
-        tempDir := scriptDir "\..\temp"
+        tempDir := "temp"
         if !DirExist(tempDir) {
             DirCreate(tempDir)
             LogMessage("创建临时目录: " tempDir)
@@ -105,14 +102,14 @@ LoadConfig() {
         global config
         
         ; 加载基本设置
-        config["ClickInterval"] := IniRead("..\config\settings.ini", "General", "ClickInterval", "2000")
-        config["AutoStart"] := IniRead("..\config\settings.ini", "General", "AutoStart", "false")
+        config["ClickInterval"] := IniRead("config\settings.ini", "General", "ClickInterval", "2000")
+        config["AutoStart"] := IniRead("config\settings.ini", "General", "AutoStart", "false")
         
         ; 加载区域配置
         config["Regions"] := Map()
         
         ; 读取所有区域配置
-        regions := IniRead("..\config\settings.ini", "Regions")
+        regions := IniRead("config\settings.ini", "Regions")
         if (regions != "ERROR") {
             for line in StrSplit(regions, "`n") {
                 if (line = "" || SubStr(line, 1, 1) = ";")
