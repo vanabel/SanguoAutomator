@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; 设置工作目录为脚本所在目录
-SetWorkingDir(A_ScriptDir)
+; 设置工作目录为项目根目录
+SetWorkingDir(A_ScriptDir "\..")
 
 ; ========== 全局变量 ==========
 global isRunning := false
@@ -16,12 +16,18 @@ global banditCampInterval := 300000  ; 5分钟 = 300000毫秒
 LoadConfig() {
     try {
         ; 加载基本设置
-        maxBanditCampCount := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditCampLoops", "10"))
-        banditCampInterval := Integer(IniRead("..\config\settings.ini", "Tasks", "BanditCampWait", "300000"))
+        LogMessage("正在加载配置文件...")
+        configPath := "config\settings.ini"
+        LogMessage("配置文件路径: " configPath)
+        
+        maxBanditCampCount := Integer(IniRead(configPath, "Tasks", "BanditCampLoops", "10"))
+        banditCampInterval := Integer(IniRead(configPath, "Tasks", "BanditCampWait", "300000"))
         
         ; 加载坐标点
         banditCampCoords := []
-        coordsStr := IniRead("..\config\settings.ini", "Tasks", "BanditCampCoords", "")
+        coordsStr := IniRead(configPath, "Tasks", "BanditCampCoords", "")
+        LogMessage("读取到的坐标字符串: " coordsStr)
+        
         if (coordsStr != "ERROR") {
             for coord in StrSplit(coordsStr, "|") {
                 parts := StrSplit(coord, ",")
@@ -30,6 +36,7 @@ LoadConfig() {
                         x: Integer(parts[1]),
                         y: Integer(parts[2])
                     })
+                    LogMessage("添加坐标点: " parts[1] ", " parts[2])
                 }
             }
         }
@@ -50,9 +57,8 @@ LoadConfig() {
 ; ========== 日志函数 ==========
 LogMessage(message, level := "INFO") {
     try {
-        ; 获取日志目录（使用脚本所在目录）
-        scriptDir := A_ScriptDir
-        logDir := scriptDir "\logs"
+        ; 获取日志目录
+        logDir := "logs"
         if !DirExist(logDir)
             DirCreate(logDir)
             
