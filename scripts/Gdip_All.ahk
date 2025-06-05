@@ -83,8 +83,47 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, clsid, quality:=75) {
 }
 
 Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
-    if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", hPalette, "ptr*", &pBitmap:=0)
-        throw Error("从HBITMAP创建位图失败: " A_LastError)
+    ; 创建位图信息结构
+    bi := Buffer(40, 0)  ; sizeof(BITMAPINFOHEADER) = 40
+    NumPut("uint", 40, bi, 0)           ; biSize
+    NumPut("uint", 0, bi, 4)            ; biWidth (will be filled by GetDIBits)
+    NumPut("uint", 0, bi, 8)            ; biHeight (will be filled by GetDIBits)
+    NumPut("ushort", 1, bi, 12)         ; biPlanes
+    NumPut("ushort", 32, bi, 14)        ; biBitCount
+    NumPut("uint", 0, bi, 16)           ; biCompression
+    
+    ; 获取位图信息
+    hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
+    if !hdc
+        throw Error("创建DC失败: " A_LastError)
+    
+    DllCall("SelectObject", "ptr", hdc, "ptr", hBitmap)
+    
+    ; 获取位图尺寸
+    if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", 0, "ptr", 0, "ptr", bi, "uint", 0)
+        throw Error("获取位图信息失败: " A_LastError)
+    
+    width := NumGet(bi, 4, "uint")
+    height := NumGet(bi, 8, "uint")
+    
+    ; 创建位图数据缓冲区
+    size := width * height * 4
+    pBits := Buffer(size, 0)
+    
+    ; 获取位图数据
+    if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", height, "ptr", pBits, "ptr", bi, "uint", 0)
+        throw Error("获取位图数据失败: " A_LastError)
+    
+    ; 创建GDI+位图
+    if !DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", width, "int", height, "int", width * 4, "int", 0x26200A, "ptr", pBits, "ptr*", &pBitmap:=0) {
+        ; 如果失败，尝试使用GdipCreateBitmapFromHBITMAP
+        if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", hPalette, "ptr*", &pBitmap:=0)
+            throw Error("创建GDI+位图失败: " A_LastError)
+    }
+    
+    ; 清理资源
+    DllCall("DeleteDC", "ptr", hdc)
+    
     return pBitmap
 }
 
