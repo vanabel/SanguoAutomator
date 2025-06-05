@@ -1,117 +1,12 @@
 #Requires AutoHotkey v2.0
 #SingleInstance force
 
-; ========== GDI+ 函数 ==========
-Gdip_Startup() {
-    try {
-        if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-            DllCall("LoadLibrary", "str", "gdiplus")
-        
-        si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
-        NumPut("uint", 1, si)              ; GdiplusVersion = 1
-        if DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken:=0, "ptr", si, "ptr", 0) {
-            throw Error("GdiplusStartup failed")
-        }
-        return pToken
-    } catch as err {
-        throw Error("GDI+ 初始化失败: " err.Message)
-    }
-}
-
-Gdip_Shutdown(pToken) {
-    try {
-        DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
-        if hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-            DllCall("FreeLibrary", "ptr", hModule)
-        return 0
-    } catch as err {
-        throw Error("GDI+ 关闭失败: " err.Message)
-    }
-}
-
-Gdip_GetEncoderClsid(sFormat) {
-    try {
-        ; 获取编码器数量
-        DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &nCount:=0, "uint*", &nSize:=0)
-        if !nCount || !nSize {
-            throw Error("无法获取编码器信息")
-        }
-        
-        ; 获取编码器信息
-        ci := Buffer(nSize)
-        DllCall("gdiplus\GdipGetImageEncoders", "uint", nCount, "uint", nSize, "ptr", ci)
-        
-        ; 查找指定格式的编码器
-        loop nCount {
-            ; 计算当前编码器信息的偏移量
-            offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
-            
-            ; 获取MIME类型字符串长度
-            mimeTypePtr := NumGet(ci, offset, "ptr")
-            if !mimeTypePtr
-                continue
-                
-            mimeTypeLen := DllCall("lstrlenW", "ptr", mimeTypePtr, "int")
-            if !mimeTypeLen
-                continue
-                
-            ; 创建缓冲区并复制MIME类型字符串
-            mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
-            DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", mimeTypePtr)
-            
-            ; 获取MIME类型字符串
-            mimeType := StrGet(mimeTypeBuf, "UTF-16")
-            
-            ; 对于PNG格式，尝试多种可能的MIME类型
-            if (sFormat = "image/png") {
-                if (mimeType = "image/png" || mimeType = "image/x-png" || mimeType = "png") {
-                    ; 返回CLSID指针
-                    return NumGet(ci, offset + 32, "ptr")
-                }
-            } else if (mimeType = sFormat) {
-                ; 返回CLSID指针
-                return NumGet(ci, offset + 32, "ptr")
-            }
-        }
-        
-        ; 如果找不到PNG编码器，尝试使用BMP编码器
-        if (sFormat = "image/png") {
-            ; 重新搜索BMP编码器
-            loop nCount {
-                offset := (A_Index - 1) * (48 + 7 * A_PtrSize)
-                mimeTypePtr := NumGet(ci, offset, "ptr")
-                if !mimeTypePtr
-                    continue
-                    
-                mimeTypeLen := DllCall("lstrlenW", "ptr", mimeTypePtr, "int")
-                if !mimeTypeLen
-                    continue
-                    
-                mimeTypeBuf := Buffer((mimeTypeLen + 1) * 2, 0)
-                DllCall("lstrcpyW", "ptr", mimeTypeBuf, "ptr", mimeTypePtr)
-                mimeType := StrGet(mimeTypeBuf, "UTF-16")
-                
-                if (mimeType = "image/bmp" || mimeType = "image/x-ms-bmp" || mimeType = "bmp") {
-                    return NumGet(ci, offset + 32, "ptr")
-                }
-            }
-        }
-        
-        throw Error("未找到指定格式的编码器: " sFormat)
-    } catch as err {
-        throw Error("获取编码器失败: " err.Message)
-    }
-}
-
-Gdip_DisposeImage(pBitmap) {
-    try {
-        if !pBitmap
-            return 0
-        return DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
-    } catch as err {
-        throw Error("释放位图失败: " err.Message)
-    }
-}
+; ========== 全局变量 ==========
+global isRunning := false
+global config := Map()
+global regionStates := Map()  ; 存储区域状态
+global regionTexts := Map()   ; 存储区域文本
+global redDotStates := Map()  ; 存储红点状态
 
 ; 设置工作目录为项目根目录
 SetWorkingDir(A_ScriptDir "\..")
@@ -142,18 +37,6 @@ LogMessage(message, level := "INFO") {
         SetTimer(RemoveToolTip, -3000)
     }
 }
-
-; ========== 全局变量 ==========
-global isRunning := false
-global config := Map()
-global regionStates := Map()  ; 存储区域状态
-global regionTexts := Map()   ; 存储区域文本
-global redDotStates := Map()  ; 存储红点状态
-global pToken := 0            ; GDI+ token
-
-; 设置使用绝对屏幕坐标
-CoordMode("Mouse", "Screen")
-CoordMode("Pixel", "Screen")
 
 ; ========== 检查并创建必要的目录 ==========
 EnsureDirectories() {
@@ -290,10 +173,14 @@ CaptureRegion(region, regionKey) {
         namePrefix := regionName.Has(regionKey) ? regionName[regionKey] : regionKey
         filename := imagesDir "\" namePrefix "_" timestamp ".bmp"  ; 使用BMP格式
         
+        ; 计算区域大小
+        width := region["x2"] - region["x1"]
+        height := region["y2"] - region["y1"]
+        
         ; 使用Windows截图功能
         try {
             ; 创建临时位图
-            hBitmap := CreateBitmap(region["x2"] - region["x1"], region["y2"] - region["y1"])
+            hBitmap := CreateBitmap(width, height)
             if !hBitmap {
                 throw Error("创建位图失败")
             }
@@ -314,12 +201,12 @@ CaptureRegion(region, regionKey) {
             hOldBitmap := DllCall("SelectObject", "ptr", hdcMem, "ptr", hBitmap, "ptr")
             
             ; 复制屏幕内容到位图
-            if !DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", region["x2"] - region["x1"], "int", region["y2"] - region["y1"], "ptr", hdcScreen, "int", region["x1"], "int", region["y1"], "uint", 0x00CC0020) {
+            if !DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", width, "int", height, "ptr", hdcScreen, "int", region["x1"], "int", region["y1"], "uint", 0x00CC0020) {
                 throw Error("复制屏幕内容失败")
             }
             
             ; 保存为BMP
-            if !SaveBitmapToFile(hBitmap, filename) {
+            if !SaveBitmapToFile(hBitmap, filename, width, height) {
                 throw Error("保存图片失败")
             }
             
@@ -351,13 +238,13 @@ CreateBitmap(width, height) {
 }
 
 ; ========== 保存位图为BMP ==========
-SaveBitmapToFile(hBitmap, filename) {
+SaveBitmapToFile(hBitmap, filename, width, height) {
     try {
         ; 创建位图信息头
         bi := Buffer(40, 0)  ; sizeof(BITMAPINFOHEADER) = 40
         NumPut("uint", 40, bi, 0)           ; biSize
-        NumPut("uint", region["x2"] - region["x1"], bi, 4)  ; biWidth
-        NumPut("uint", -(region["y2"] - region["y1"]), bi, 8)  ; biHeight (负值表示自上而下)
+        NumPut("uint", width, bi, 4)        ; biWidth
+        NumPut("uint", -height, bi, 8)      ; biHeight (负值表示自上而下)
         NumPut("ushort", 1, bi, 12)         ; biPlanes
         NumPut("ushort", 32, bi, 14)        ; biBitCount
         NumPut("uint", 0, bi, 16)           ; biCompression
@@ -375,7 +262,7 @@ SaveBitmapToFile(hBitmap, filename) {
         
         ; 写入BMP文件头
         file.WriteUInt(0x4D42)              ; 签名 "BM"
-        file.WriteUInt(54 + (region["x2"] - region["x1"]) * (region["y2"] - region["y1"]) * 4)  ; 文件大小
+        file.WriteUInt(54 + width * height * 4)  ; 文件大小
         file.WriteUInt(0)                   ; 保留
         file.WriteUInt(54)                  ; 位图数据偏移
         file.Write(bi)                      ; 位图信息头
@@ -389,11 +276,11 @@ SaveBitmapToFile(hBitmap, filename) {
         DllCall("SelectObject", "ptr", hdc, "ptr", hBitmap)
         
         ; 分配内存
-        size := (region["x2"] - region["x1"]) * (region["y2"] - region["y1"]) * 4
+        size := width * height * 4
         pBits := Buffer(size, 0)
         
         ; 获取位图数据
-        if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", region["y2"] - region["y1"], "ptr", pBits, "ptr", bi, "uint", 0) {
+        if !DllCall("GetDIBits", "ptr", hdc, "ptr", hBitmap, "uint", 0, "uint", height, "ptr", pBits, "ptr", bi, "uint", 0) {
             throw Error("获取位图数据失败")
         }
         
@@ -756,12 +643,6 @@ Main() {
     try {
         LogMessage("脚本启动")
         
-        ; 初始化GDI+
-        if !pToken := Gdip_Startup() {
-            LogMessage("GDI+ 初始化失败！", "ERROR")
-            return
-        }
-        
         ; 检查Tesseract是否安装
         if (!CheckTesseract()) {
             LogMessage("Tesseract未安装，脚本退出", "ERROR")
@@ -847,9 +728,7 @@ RemoveToolTip() {
 
 ; ========== 退出处理 ==========
 ExitFunc(ExitReason, ExitCode) {
-    global pToken
     LogMessage("脚本退出，原因: " ExitReason)
-    Gdip_Shutdown(pToken)
 }
 
 OnExit(ExitFunc)
