@@ -108,9 +108,8 @@ RaidBanditCamp() {
     Click(coord[1], coord[2])
     LogMessage("点击山贼营寨坐标: " coord[1] ", " coord[2])
     
-    ; 等待确认按钮出现并点击
-    Sleep(1000)
-    Click(coord[1] + 50, coord[2] + 50)  ; 点击确认按钮位置
+    ; 等待2秒后继续
+    Sleep(2000)
     
     ; 更新计数和时间
     banditCampCount++
