@@ -180,47 +180,106 @@ CaptureRegion(region, regionKey) {
         width := region["x2"] - region["x1"]
         height := region["y2"] - region["y1"]
         
-        ; 使用TXGYMailCamera.dll进行截图
         try {
-            ; 尝试多个可能的DLL路径
-            dllPaths := [
-                A_ScriptDir "\TXGYMailCamera.dll",  ; 脚本目录
-                A_ScriptDir "\..\TXGYMailCamera.dll",  ; 上级目录
-                "C:\Windows\System32\TXGYMailCamera.dll",  ; System32目录
-                "TXGYMailCamera.dll"  ; 当前目录
-            ]
+            ; 声明所有变量
+            pToken := 0
+            pImage := 0
+            pCroppedImage := 0
+            pGraphics := 0
+            imgWidth := 0
+            imgHeight := 0
+            hBitmap := 0
+            hGdiPlus := 0
+            hPrScrn := 0
+            clsid := 0
             
-            dllLoaded := false
-            for dllPath in dllPaths {
-                if FileExist(dllPath) {
-                    LogMessage("尝试加载DLL: " dllPath)
-                    if hModule := DllCall("LoadLibrary", "str", dllPath, "ptr") {
-                        dllLoaded := true
-                        LogMessage("成功加载DLL: " dllPath)
-                        break
-                    } else {
-                        errorCode := A_LastError
-                        LogMessage("加载DLL失败: " dllPath " (错误代码: " errorCode ")", "ERROR")
-                    }
-                }
+            ; 检查PrScrn.dll是否存在
+            dllPath := A_ScriptDir "\..\Dlls\PrScrn.dll"
+            if !FileExist(dllPath) {
+                throw Error("PrScrn.dll不存在，请确保它在Dlls目录下。`n"
+                    . "下载地址: https://github.com/vanabel/GameAutomator/releases/download/v1.0.0/PrScrn.dll")
             }
             
-            if !dllLoaded {
-                throw Error("无法加载TXGYMailCamera.dll，请确保DLL文件存在且可访问")
+            ; 加载PrScrn.dll
+            hPrScrn := DllCall("LoadLibrary", "str", dllPath, "ptr")
+            if !hPrScrn {
+                throw Error("加载PrScrn.dll失败，错误代码: " A_LastError)
             }
             
-            ; 调用截图函数
-            result := DllCall("TXGYMailCamera.dll\CaptureScreen", 
-                "int", region["x1"],  ; 起始X坐标
-                "int", region["y1"],  ; 起始Y坐标
-                "int", width,         ; 宽度
-                "int", height,        ; 高度
-                "str", filename,      ; 输出文件路径
-                "int")               ; 返回值
-            
-            if (result != 1) {
-                throw Error("截图失败，错误代码: " result)
+            ; 初始化GDI+
+            hGdiPlus := DllCall("LoadLibrary", "str", "gdiplus", "ptr")
+            if !hGdiPlus {
+                DllCall("FreeLibrary", "ptr", hPrScrn)
+                throw Error("加载GDI+失败，错误代码: " A_LastError)
             }
+            
+            si := Buffer(16, 0)
+            NumPut("uint", 1, si, 0)
+            if !DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken, "ptr", si, "ptr", 0) {
+                DllCall("FreeLibrary", "ptr", hGdiPlus)
+                DllCall("FreeLibrary", "ptr", hPrScrn)
+                throw Error("GDI+初始化失败，错误代码: " A_LastError)
+            }
+            
+            ; 使用PrScrn.dll截图
+            if !DllCall("PrScrn.dll\PrScrn", "int") {
+                throw Error("截图失败，错误代码: " A_LastError)
+            }
+            
+            ; 从剪贴板获取图像
+            if !DllCall("OpenClipboard", "ptr", 0) {
+                throw Error("打开剪贴板失败，错误代码: " A_LastError)
+            }
+            
+            if !DllCall("IsClipboardFormatAvailable", "uint", 2) {
+                DllCall("CloseClipboard")
+                throw Error("剪贴板中没有图像")
+            }
+            
+            hBitmap := DllCall("GetClipboardData", "uint", 2, "ptr")
+            if !hBitmap {
+                DllCall("CloseClipboard")
+                throw Error("获取剪贴板图像失败，错误代码: " A_LastError)
+            }
+            
+            ; 创建GDI+位图
+            if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", 0, "ptr*", &pImage) {
+                DllCall("CloseClipboard")
+                throw Error("创建GDI+位图失败，错误代码: " A_LastError)
+            }
+            
+            DllCall("CloseClipboard")
+            
+            ; 获取图像尺寸
+            DllCall("gdiplus\GdipGetImageWidth", "ptr", pImage, "uint*", &imgWidth)
+            DllCall("gdiplus\GdipGetImageHeight", "ptr", pImage, "uint*", &imgHeight)
+            
+            ; 创建新的位图用于裁剪
+            DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", width, "int", height, "int", 0, "int", 0x26200A, "ptr", 0, "ptr*", &pCroppedImage)
+            
+            ; 创建图形对象
+            DllCall("gdiplus\GdipGetImageGraphicsContext", "ptr", pCroppedImage, "ptr*", &pGraphics)
+            
+            ; 绘制裁剪区域
+            DllCall("gdiplus\GdipDrawImageRectRect", "ptr", pGraphics, "ptr", pImage, 
+                "float", 0, "float", 0, "float", width, "float", height,
+                "float", region["x1"], "float", region["y1"], "float", width, "float", height,
+                "int", 2, "ptr", 0, "ptr", 0, "ptr", 0)
+            
+            ; 获取PNG编码器CLSID
+            clsid := Gdip_GetEncoderClsid("image/png")
+            
+            ; 保存为PNG
+            DllCall("gdiplus\GdipSaveImageToFile", "ptr", pCroppedImage, "str", filename, "ptr", clsid, "ptr", 0)
+            
+            ; 清理资源
+            DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
+            DllCall("gdiplus\GdipDisposeImage", "ptr", pCroppedImage)
+            DllCall("gdiplus\GdipDisposeImage", "ptr", pImage)
+            DllCall("DeleteObject", "ptr", hBitmap)
+            DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+            DllCall("FreeLibrary", "ptr", hGdiPlus)
+            DllCall("FreeLibrary", "ptr", hPrScrn)
             
             ; 验证文件是否创建成功
             if !FileExist(filename) {
@@ -229,7 +288,15 @@ CaptureRegion(region, regionKey) {
             
             LogMessage("截图成功: " filename)
             return filename
+            
         } catch as err {
+            ; 确保清理资源
+            if (hGdiPlus) {
+                DllCall("FreeLibrary", "ptr", hGdiPlus)
+            }
+            if (hPrScrn) {
+                DllCall("FreeLibrary", "ptr", hPrScrn)
+            }
             throw Error("截图过程失败: " err.Message)
         }
     } catch as err {

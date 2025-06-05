@@ -3,14 +3,17 @@
 ; ========== GDI+ Functions ==========
 Gdip_Startup() {
     static pToken := 0
+    hModule := 0
+    si := 0
     
     ; 如果已经初始化，直接返回token
     if pToken
         return pToken
     
     ; 加载GDI+库
-    if !DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
-        DllCall("LoadLibrary", "str", "gdiplus")
+    hModule := DllCall("GetModuleHandle", "str", "gdiplus", "ptr")
+    if !hModule
+        hModule := DllCall("LoadLibrary", "str", "gdiplus", "ptr")
     
     ; 创建GDI+启动输入结构
     si := Buffer(24, 0)                ; sizeof(GdiplusStartupInput) = 24
@@ -48,8 +51,15 @@ Gdip_Shutdown(pToken) {
 }
 
 Gdip_GetEncoderClsid(format) {
+    ; 声明变量
+    numEncoders := 0
+    size := 0
+    encoders := 0
+    encoder := 0
+    clsid := 0
+    
     ; 获取编码器CLSID
-    if !DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &numEncoders:=0, "uint*", &size:=0)
+    if !DllCall("gdiplus\GdipGetImageEncodersSize", "uint*", &numEncoders, "uint*", &size)
         throw Error("获取编码器大小失败: " A_LastError)
     
     encoders := Buffer(size)
@@ -83,6 +93,16 @@ Gdip_SaveBitmapToFile(pBitmap, sOutput, clsid, quality:=75) {
 }
 
 Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
+    ; 声明变量
+    bm := 0
+    width := 0
+    height := 0
+    bi := 0
+    hdc := 0
+    size := 0
+    pBits := 0
+    pBitmap := 0
+    
     ; 获取位图信息
     bm := Buffer(24, 0)  ; sizeof(BITMAP) = 24
     if !DllCall("GetObject", "ptr", hBitmap, "int", 24, "ptr", bm)
@@ -116,9 +136,9 @@ Gdip_CreateBitmapFromHBITMAP(hBitmap, hPalette:=0) {
         throw Error("获取位图数据失败: " A_LastError)
     
     ; 创建GDI+位图
-    if !DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", width, "int", height, "int", width * 4, "int", 0x26200A, "ptr", pBits, "ptr*", &pBitmap:=0) {
+    if !DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", width, "int", height, "int", width * 4, "int", 0x26200A, "ptr", pBits, "ptr*", &pBitmap) {
         ; 如果失败，尝试使用GdipCreateBitmapFromHBITMAP
-        if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", hPalette, "ptr*", &pBitmap:=0)
+        if !DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "ptr", hBitmap, "ptr", hPalette, "ptr*", &pBitmap)
             throw Error("创建GDI+位图失败: " A_LastError)
     }
     
