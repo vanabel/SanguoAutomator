@@ -76,6 +76,13 @@ CheckStatus() {
             
             currentLoop++
             ToolTip("完成第 " currentLoop "/" totalLoops " 轮")
+            
+            ; 点击两次返回初始状态
+            Click(1230, 790)
+            Sleep(1000)
+            Click(1230, 790)
+            Sleep(1000)
+            
             Sleep(32400000)  ; 每轮之间等待9小时 (9 * 60 * 60 * 1000 = 32400000毫秒)
         } else {
             isRunning := false
