@@ -27,7 +27,8 @@ MyGui := Gui("+Resize")  ; 添加可调整大小的样式
 MyGui.Title := "自动点击器"
 MyGui.SetFont("s10")  ; 设置字体大小
 MyGui.Add("Text", "w260", "自动点击器")
-MyGui.Add("Button", "w260", "点击捕获位置").OnEvent("Click", StartCapture)
+CaptureButton := MyGui.Add("Button", "w260", "点击捕获位置")
+CaptureButton.OnEvent("Click", StartCapture)
 ClickPosText := MyGui.Add("Text", "w260", "点击位置: 未设置")
 ClickModeText := MyGui.Add("Text", "w260", "点击模式: 未设置")
 MyGui.Add("Button", "w260", "测试点击").OnEvent("Click", TestClick)
@@ -60,10 +61,14 @@ ShowMouseCoords() {
 
 ; 开始捕获模式
 StartCapture(*) {
-    global captureMode
+    global captureMode, CaptureButton
     captureMode := true
     SetTimer(ShowMouseCoords, 10)  ; 每10ms更新一次
     ShowStatusTip("移动鼠标到目标位置，点击设置坐标")
+    
+    ; 更改按钮颜色和文本
+    CaptureButton.Text := "等待捕获..."
+    CaptureButton.Opt("+BackgroundFFA500")  ; 橙色背景
     
     ; 注册全局热键
     Hotkey("LButton", CaptureClick, "On")
@@ -72,7 +77,7 @@ StartCapture(*) {
 
 ; 取消捕获
 CancelCapture(*) {
-    global captureMode, pendingClick, doubleClickTimeout
+    global captureMode, CaptureButton
     if (!captureMode)
         return
         
@@ -80,13 +85,9 @@ CancelCapture(*) {
     SetTimer(ShowMouseCoords, 0)
     ToolTip()
     
-    ; 清理可能存在的双击检测计时器
-    if (doubleClickTimeout) {
-        SetTimer(doubleClickTimeout, 0)
-        doubleClickTimeout := 0
-    }
-    
-    pendingClick := false
+    ; 恢复按钮状态
+    CaptureButton.Text := "点击捕获位置"
+    CaptureButton.Opt("+BackgroundDefault")
     
     ; 注销全局热键
     Hotkey("LButton", "Off")
@@ -98,7 +99,7 @@ CancelCapture(*) {
 ; 捕获点击
 CaptureClick(*) {
     global clickX, clickY, isDoubleClick, captureMode, pendingClick, clickPosTemp
-    global doubleClickTimeout, ClickPosText, ClickModeText
+    global doubleClickTimeout, ClickPosText, ClickModeText, CaptureButton
     
     if (!captureMode)
         return
@@ -149,7 +150,7 @@ SingleClickTimeout() {
 
 ; 完成捕获过程
 FinishCapture() {
-    global captureMode, clickX, clickY, isDoubleClick, ClickPosText, ClickModeText
+    global captureMode, clickX, clickY, isDoubleClick, ClickPosText, ClickModeText, CaptureButton
     
     ; 停止捕获模式
     captureMode := false
@@ -159,6 +160,10 @@ FinishCapture() {
     ; 注销全局热键
     Hotkey("LButton", "Off")
     Hotkey("Escape", "Off")
+    
+    ; 更新按钮状态
+    CaptureButton.Text := "已捕获位置"
+    CaptureButton.Opt("+Background90EE90")  ; 浅绿色背景
     
     ; 更新界面显示
     ClickPosText.Text := "点击位置: X" clickX " Y" clickY
