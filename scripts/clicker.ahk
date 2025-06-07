@@ -20,6 +20,7 @@ global pendingClick := false
 global clickPosTemp := {x: 0, y: 0}
 global doubleClickTimeout := 0
 global totalClicks := 0
+global MyGui := 0
 
 ; 创建主窗口
 MyGui := Gui("+Resize")  ; 添加可调整大小的样式
@@ -32,13 +33,16 @@ ClickModeText := MyGui.Add("Text", "w260", "点击模式: 未设置")
 MyGui.Add("Button", "w260", "测试点击").OnEvent("Click", TestClick)
 MyGui.Add("Text", "w260", "设置间隔时间 (秒):")
 IntervalNumber := MyGui.Add("Edit", "w260", "1")
-MyGui.Add("Button", "w260", "开始点击").OnEvent("Click", StartClicking)
-MyGui.Add("Button", "w260", "停止点击").OnEvent("Click", StopClicking)
+StartButton := MyGui.Add("Button", "w260", "开始点击").OnEvent("Click", StartClicking)
+StopButton := MyGui.Add("Button", "w260", "停止点击").OnEvent("Click", StopClicking)
 TotalClicksText := MyGui.Add("Text", "w260", "总点击次数: 0")
 MyGui.Add("Button", "w260", "重置点击计数").OnEvent("Click", ResetClickCount)
+MyGui.Add("Text", "w260 vShortcutText", "快捷键: F1=开始/停止 F2=重载 F3=帮助")
 
-; 显示窗口
+; 显示窗口并设置位置
 MyGui.Show()
+WinGetPos(&X, &Y, &Width, &Height, "自动点击器")
+MyGui.Move(0, A_ScreenHeight - Height - 50)
 
 ; 显示状态提示
 ShowStatusTip(text) {
@@ -257,6 +261,43 @@ ResetClickCount(*) {
 #HotIf WinActive("ahk_class AutoHotkeyGUI") and !captureMode
 Esc::ExitApp()
 #HotIf
+
+; F1 切换开始/停止
+F1::ToggleClicking()
+
+; F2 重载脚本
+F2::Reload()
+
+; F3 显示帮助
+F3::ShowHelp()
+
+; 切换开始/停止
+ToggleClicking() {
+    global isRunning
+    
+    if (isRunning) {
+        StopClicking()
+    } else {
+        StartClicking()
+    }
+}
+
+; 显示帮助
+ShowHelp() {
+    helpText := "快捷键说明：`n"
+        . "F1 - 开始/停止点击`n"
+        . "F2 - 重载脚本`n"
+        . "F3 - 显示此帮助信息`n`n"
+        . "功能说明：`n"
+        . "1. 点击“点击捕获位置”按钮设置目标位置`n"
+        . "2. 移动鼠标到目标位置后单击或双击`n"
+        . "3. 设置点击间隔时间`n"
+        . "4. 点击“开始点击”或按F1开始`n"
+        . "5. 使用“测试点击”按钮测试位置`n"
+        . "6. 点击次数会自动计数，可通过按钮重置"
+    
+    MsgBox(helpText, "自动点击器帮助")
+}
 
 ; 关闭窗口时退出
 MyGui.OnEvent("Close", (*) => ExitApp())
