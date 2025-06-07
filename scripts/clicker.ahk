@@ -16,6 +16,9 @@ global clickTimer := 0
 global statusTip := ""
 global captureMode := false
 global lastClickTime := 0
+global pendingClick := false
+global clickPosTemp := {x: 0, y: 0}
+global doubleClickTimeout := 0
 
 ; 创建主窗口
 MyGui := Gui("+Resize")  ; 添加可调整大小的样式
@@ -62,13 +65,21 @@ StartCapture(*) {
 
 ; 取消捕获
 CancelCapture(*) {
-    global captureMode
+    global captureMode, pendingClick, doubleClickTimeout
     if (!captureMode)
         return
         
     captureMode := false
     SetTimer(ShowMouseCoords, 0)
     ToolTip()
+    
+    ; 清理可能存在的双击检测计时器
+    if (doubleClickTimeout) {
+        SetTimer(doubleClickTimeout, 0)
+        doubleClickTimeout := 0
+    }
+    
+    pendingClick := false
     
     ; 注销全局热键
     Hotkey("LButton", "Off")
@@ -79,22 +90,59 @@ CancelCapture(*) {
 
 ; 捕获点击
 CaptureClick(*) {
-    global clickX, clickY, isDoubleClick, captureMode, lastClickTime, ClickPosText, ClickModeText
+    global clickX, clickY, isDoubleClick, captureMode, pendingClick, clickPosTemp
+    global doubleClickTimeout, ClickPosText, ClickModeText
     
     if (!captureMode)
         return
     
     ; 获取点击坐标
-    MouseGetPos(&clickX, &clickY)
+    MouseGetPos(&currentX, &currentY)
     
-    ; 计算点击时间差，判断是单击还是双击
-    currentTime := A_TickCount
-    if (currentTime - lastClickTime <= 500) {  ; 500ms内第二次点击视为双击
+    ; 如果已经有一个挂起的点击，这是第二次点击（双击）
+    if (pendingClick) {
+        ; 清除挂起的超时计时器
+        if (doubleClickTimeout) {
+            SetTimer(doubleClickTimeout, 0)
+            doubleClickTimeout := 0
+        }
+        
+        pendingClick := false
         isDoubleClick := true
+        clickX := clickPosTemp.x
+        clickY := clickPosTemp.y
+        
+        ; 完成捕获
+        FinishCapture()
     } else {
-        isDoubleClick := false
-        lastClickTime := currentTime
+        ; 这是第一次点击，记录并等待可能的第二次点击
+        pendingClick := true
+        clickPosTemp.x := currentX
+        clickPosTemp.y := currentY
+        
+        ; 设置超时，如果没有第二次点击发生，则视为单击
+        doubleClickTimeout := SetTimer(SingleClickTimeout, -500)  ; 500ms内没有第二次点击则视为单击
     }
+}
+
+; 单击超时处理
+SingleClickTimeout() {
+    global pendingClick, clickPosTemp, clickX, clickY, isDoubleClick
+    
+    if (pendingClick) {
+        pendingClick := false
+        isDoubleClick := false
+        clickX := clickPosTemp.x
+        clickY := clickPosTemp.y
+        
+        ; 完成捕获
+        FinishCapture()
+    }
+}
+
+; 完成捕获过程
+FinishCapture() {
+    global captureMode, clickX, clickY, isDoubleClick, ClickPosText, ClickModeText
     
     ; 停止捕获模式
     captureMode := false
