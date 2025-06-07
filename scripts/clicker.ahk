@@ -19,6 +19,7 @@ global lastClickTime := 0
 global pendingClick := false
 global clickPosTemp := {x: 0, y: 0}
 global doubleClickTimeout := 0
+global totalClicks := 0
 
 ; 创建主窗口
 MyGui := Gui("+Resize")  ; 添加可调整大小的样式
@@ -33,6 +34,8 @@ MyGui.Add("Text", "w260", "设置间隔时间 (秒):")
 IntervalNumber := MyGui.Add("Edit", "w260", "1")
 MyGui.Add("Button", "w260", "开始点击").OnEvent("Click", StartClicking)
 MyGui.Add("Button", "w260", "停止点击").OnEvent("Click", StopClicking)
+TotalClicksText := MyGui.Add("Text", "w260", "总点击次数: 0")
+MyGui.Add("Button", "w260", "重置点击计数").OnEvent("Click", ResetClickCount)
 
 ; 显示窗口
 MyGui.Show()
@@ -163,7 +166,7 @@ FinishCapture() {
 
 ; 测试点击
 TestClick(*) {
-    global clickX, clickY, isDoubleClick, doubleClickInterval
+    global clickX, clickY, isDoubleClick, doubleClickInterval, totalClicks, TotalClicksText
     if (clickX = 0 && clickY = 0) {
         ShowStatusTip("请先设置点击位置！")
         return
@@ -177,6 +180,10 @@ TestClick(*) {
     } else {
         Click(clickX " " clickY)
     }
+    
+    ; 更新点击计数（测试点击也计入总数）
+    totalClicks += 1
+    TotalClicksText.Text := "总点击次数: " totalClicks
     
     ShowStatusTip("测试点击位置: X" clickX " Y" clickY)
 }
@@ -221,7 +228,7 @@ StopClicking(*) {
 
 ; 执行点击
 PerformClick() {
-    global clickX, clickY, isDoubleClick, doubleClickInterval, isRunning
+    global clickX, clickY, isDoubleClick, doubleClickInterval, isRunning, totalClicks, TotalClicksText
     if (!isRunning)
         return
         
@@ -232,6 +239,18 @@ PerformClick() {
     } else {
         Click(clickX " " clickY)
     }
+    
+    ; 更新点击计数（无论单击还是双击都只计数一次）
+    totalClicks += 1
+    TotalClicksText.Text := "总点击次数: " totalClicks
+}
+
+; 重置点击计数
+ResetClickCount(*) {
+    global totalClicks, TotalClicksText
+    totalClicks := 0
+    TotalClicksText.Text := "总点击次数: 0"
+    ShowStatusTip("点击计数已重置")
 }
 
 ; 按ESC键退出程序(当不在捕获模式时)
