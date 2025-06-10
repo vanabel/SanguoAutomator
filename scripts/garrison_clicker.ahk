@@ -4,17 +4,20 @@
 ; 设置坐标模式为屏幕绝对坐标
 CoordMode("Mouse", "Screen")
 CoordMode("ToolTip", "Screen")
+CoordMode("Pixel", "Screen")  ; 添加像素坐标模式
 
 ; 全局变量
-global clickX := 0
-global clickY := 0
+global clickX1 := 0
+global clickY1 := 0
+global clickX2 := 0
+global clickY2 := 0
 global startTime := "20:00"
 global intervalTime := 4
 global delayTime := 1
 global isRunning := false
 global clickTimer := 0
 global statusTip := ""
-global captureMode := false
+global captureMode := 0  ; 0: 未捕获, 1: 捕获第一个点, 2: 捕获第二个点
 global totalClicks := 0
 global MyGui := 0
 
@@ -27,7 +30,8 @@ MyGui.Add("Text", "w260", "驻防自动点击器")
 ; 添加捕获按钮
 CaptureButton := MyGui.Add("Button", "w260", "点击捕获位置")
 CaptureButton.OnEvent("Click", StartCapture)
-ClickPosText := MyGui.Add("Text", "w260", "点击位置: 未设置")
+ClickPosText1 := MyGui.Add("Text", "w260", "点击位置1: 未设置")
+ClickPosText2 := MyGui.Add("Text", "w260", "点击位置2: 未设置")
 
 ; 添加时间设置
 MyGui.Add("Text", "w260", "首次启动时间 (HH:MM):")
@@ -66,11 +70,11 @@ ShowMouseCoords() {
 ; 开始捕获模式
 StartCapture(*) {
     global captureMode, CaptureButton
-    captureMode := true
+    captureMode := 1
     SetTimer(ShowMouseCoords, 10)
-    ShowStatusTip("移动鼠标到目标位置，点击设置坐标")
+    ShowStatusTip("移动鼠标到第一个目标位置，点击设置坐标")
     
-    CaptureButton.Text := "等待捕获..."
+    CaptureButton.Text := "等待捕获第一个位置..."
     CaptureButton.Opt("+BackgroundFFA500")  ; 橙色背景
     
     Hotkey("LButton", CaptureClick, "On")
@@ -83,7 +87,7 @@ CancelCapture(*) {
     if (!captureMode)
         return
         
-    captureMode := false
+    captureMode := 0
     SetTimer(ShowMouseCoords, 0)
     ToolTip()
     
@@ -98,42 +102,69 @@ CancelCapture(*) {
 
 ; 捕获点击
 CaptureClick(*) {
-    global clickX, clickY, captureMode, CaptureButton, ClickPosText
+    global clickX1, clickY1, clickX2, clickY2, captureMode, CaptureButton, ClickPosText1, ClickPosText2
     
     if (!captureMode)
         return
     
-    MouseGetPos(&clickX, &clickY)
+    MouseGetPos(&currentX, &currentY)
     
-    captureMode := false
-    SetTimer(ShowMouseCoords, 0)
-    ToolTip()
-    
-    Hotkey("LButton", "Off")
-    Hotkey("Escape", "Off")
-    
-    CaptureButton.Text := "已捕获位置"
-    CaptureButton.Opt("+Background90EE90")  ; 浅绿色背景
-    
-    ClickPosText.Text := "点击位置: X" clickX " Y" clickY
-    ShowStatusTip("已设置点击位置: X" clickX " Y" clickY)
+    if (captureMode = 1) {
+        ; 捕获第一个点
+        clickX1 := currentX
+        clickY1 := currentY
+        ClickPosText1.Text := "点击位置1: X" clickX1 " Y" clickY1
+        captureMode := 2
+        CaptureButton.Text := "等待捕获第二个位置..."
+        ShowStatusTip("已设置第一个位置，请移动鼠标到第二个目标位置")
+    } else if (captureMode = 2) {
+        ; 捕获第二个点
+        clickX2 := currentX
+        clickY2 := currentY
+        ClickPosText2.Text := "点击位置2: X" clickX2 " Y" clickY2
+        
+        ; 完成捕获
+        captureMode := 0
+        SetTimer(ShowMouseCoords, 0)
+        ToolTip()
+        
+        Hotkey("LButton", "Off")
+        Hotkey("Escape", "Off")
+        
+        CaptureButton.Text := "已捕获位置"
+        CaptureButton.Opt("+Background90EE90")  ; 浅绿色背景
+        
+        ShowStatusTip("已设置所有点击位置")
+    }
 }
 
 ; 执行点击序列
 PerformClickSequence() {
-    global clickX, clickY, delayTime, totalClicks, TotalClicksText, isRunning
+    global clickX1, clickY1, clickX2, clickY2, delayTime, totalClicks, TotalClicksText, isRunning
     
     if (!isRunning)
         return
     
-    ; 点击序列
-    Click(clickX " " clickY)
+    ; 点击序列 - 使用绝对屏幕坐标
+    ToolTip("点击位置 1: X" clickX1 " Y" clickY1, clickX1 + 20, clickY1 + 20)
+    Click(clickX1 " " clickY1)  ; 第一个用户捕获的位置
     Sleep(delayTime * 1000)
-    Click("1030 415")
+    ToolTip()
+    
+    ToolTip("点击位置 2: X" clickX2 " Y" clickY2, clickX2 + 20, clickY2 + 20)
+    Click(clickX2 " " clickY2)  ; 第二个用户捕获的位置
     Sleep(delayTime * 1000)
-    Click("1080 740")
+    ToolTip()
+    
+    ToolTip("点击位置 3: X1080 Y740", 1080 + 20, 740 + 20)
+    Click("1080 740")  ; 第三个固定位置
     Sleep(delayTime * 1000)
-    Click("1080 800")
+    ToolTip()
+    
+    ToolTip("点击位置 4: X1080 Y800", 1080 + 20, 800 + 20)
+    Click("1080 800")  ; 第四个固定位置
+    Sleep(delayTime * 1000)
+    ToolTip()
     
     ; 更新点击计数
     totalClicks += 1
@@ -142,10 +173,10 @@ PerformClickSequence() {
 
 ; 开始点击
 StartClicking(*) {
-    global clickX, clickY, startTime, intervalTime, delayTime, isRunning, clickTimer
+    global clickX1, clickY1, clickX2, clickY2, startTime, intervalTime, delayTime, isRunning, clickTimer
     
-    if (clickX = 0 && clickY = 0) {
-        ShowStatusTip("请先设置点击位置！")
+    if (clickX1 = 0 && clickY1 = 0 || clickX2 = 0 && clickY2 = 0) {
+        ShowStatusTip("请先设置所有点击位置！")
         return
     }
     
@@ -158,32 +189,27 @@ StartClicking(*) {
     
     ; 计算首次执行时间
     currentTime := FormatTime(, "HH:mm")
-    if (currentTime >= startTime) {
+    currentMinutes := TimeToMinutes(currentTime)
+    targetMinutes := TimeToMinutes(startTime)
+    
+    if (currentMinutes >= targetMinutes) {
         ; 如果当前时间已经超过启动时间，立即开始
         PerformClickSequence()
         clickTimer := SetTimer(PerformClickSequence, intervalTime * 60 * 1000)
     } else {
         ; 否则等待到指定时间
-        timeToWait := TimeToWait(startTime)
-        SetTimer(() => {
-            PerformClickSequence()
-            clickTimer := SetTimer(PerformClickSequence, intervalTime * 60 * 1000)
-        }, timeToWait * 1000)
+        timeToWait := (targetMinutes - currentMinutes) * 60
+        SetTimer(StartDelayedSequence, timeToWait * 1000)
     }
     
     ShowStatusTip("已开始点击 - 间隔: " intervalTime "分钟")
 }
 
-; 计算等待时间（秒）
-TimeToWait(targetTime) {
-    currentTime := FormatTime(, "HH:mm")
-    currentMinutes := TimeToMinutes(currentTime)
-    targetMinutes := TimeToMinutes(targetTime)
-    
-    if (targetMinutes <= currentMinutes)
-        targetMinutes += 24 * 60  ; 如果目标时间已经过去，设置为明天
-    
-    return (targetMinutes - currentMinutes) * 60
+; 延迟启动序列
+StartDelayedSequence() {
+    global clickTimer, intervalTime
+    PerformClickSequence()
+    clickTimer := SetTimer(PerformClickSequence, intervalTime * 60 * 1000)
 }
 
 ; 将时间转换为分钟数
@@ -248,11 +274,11 @@ ShowHelp() {
         . "F2 - 重载脚本`n"
         . "F3 - 显示此帮助信息`n`n"
         . "功能说明：`n"
-        . "1. 点击"点击捕获位置"按钮设置初始点击位置`n"
+        . "1. 点击《点击捕获位置》按钮设置初始点击位置`n"
         . "2. 设置首次启动时间（默认20:00）`n"
         . "3. 设置间隔时间（默认4分钟）`n"
         . "4. 设置延迟时间（默认1秒，可为负数）`n"
-        . "5. 点击"开始点击"或按F1开始`n"
+        . "5. 点击《开始点击》或按F1开始`n"
         . "6. 点击次数会自动计数，可通过按钮重置"
     
     MsgBox(helpText, "驻防自动点击器帮助")
