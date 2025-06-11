@@ -54,7 +54,7 @@ MyGui.Add("Text", "w260", "执行次数:")
 CountEdit := MyGui.Add("Edit", "w260", maxCount)
 
 ; 添加控制按钮
-StartButton := MyGui.Add("Button", "w260", ""开始挑战"").OnEvent("Click", StartChallenge)
+StartButton := MyGui.Add("Button", "w260", "《开始挑战》").OnEvent("Click", StartChallenge)
 StopButton := MyGui.Add("Button", "w260", "停止挑战").OnEvent("Click", StopChallenge)
 CurrentCountText := MyGui.Add("Text", "w260", "当前执行次数: " currentCount)
 MyGui.Add("Button", "w260", "重置计数").OnEvent("Click", ResetCount)
