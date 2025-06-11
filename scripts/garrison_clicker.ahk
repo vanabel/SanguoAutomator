@@ -14,6 +14,7 @@ global clickY2 := 0
 global startTime := "20:00"
 global intervalTime := 4
 global delayTime := 1
+global warriorCount := 2  ; 新增：默认发送2队武将
 global isRunning := false
 global clickTimer := 0
 global statusTip := ""
@@ -40,6 +41,8 @@ MyGui.Add("Text", "w260", "间隔时间 (分钟):")
 IntervalEdit := MyGui.Add("Edit", "w260", intervalTime)
 MyGui.Add("Text", "w260", "延迟时间 (秒，可为负数):")
 DelayEdit := MyGui.Add("Edit", "w260", delayTime)
+MyGui.Add("Text", "w260", "发送武将数量 (队):")
+WarriorCountEdit := MyGui.Add("Edit", "w260", warriorCount)
 
 ; 添加控制按钮
 StartButton := MyGui.Add("Button", "w260", "开始点击").OnEvent("Click", StartClicking)
@@ -140,40 +143,48 @@ CaptureClick(*) {
 
 ; 执行点击序列
 PerformClickSequence() {
-    global clickX1, clickY1, clickX2, clickY2, delayTime, totalClicks, TotalClicksText, isRunning
+    global clickX1, clickY1, clickX2, clickY2, delayTime, totalClicks, TotalClicksText, isRunning, warriorCount
     
     if (!isRunning)
         return
     
-    ; 点击序列 - 使用绝对屏幕坐标
-    ToolTip("点击位置 1: X" clickX1 " Y" clickY1, clickX1 + 20, clickY1 + 20)
-    Click(clickX1 " " clickY1)  ; 第一个用户捕获的位置
-    Sleep(delayTime * 1000)
-    ToolTip()
-    
-    ToolTip("点击位置 2: X" clickX2 " Y" clickY2, clickX2 + 20, clickY2 + 20)
-    Click(clickX2 " " clickY2)  ; 第二个用户捕获的位置
-    Sleep(delayTime * 1000)
-    ToolTip()
-    
-    ToolTip("点击位置 3: X1080 Y740", 1080 + 20, 740 + 20)
-    Click("1080 740")  ; 第三个固定位置
-    Sleep(delayTime * 1000)
-    ToolTip()
-    
-    ToolTip("点击位置 4: X1080 Y800", 1080 + 20, 800 + 20)
-    Click("1080 800")  ; 第四个固定位置
-    Sleep(delayTime * 1000)
-    ToolTip()
-    
-    ; 更新点击计数
-    totalClicks += 1
-    TotalClicksText.Text := "总点击次数: " totalClicks
+    ; 循环发送指定数量的武将
+    Loop warriorCount {
+        ; 点击序列 - 使用绝对屏幕坐标
+        ToolTip("点击位置 1: X" clickX1 " Y" clickY1, clickX1 + 20, clickY1 + 20)
+        Click(clickX1 " " clickY1)  ; 第一个用户捕获的位置
+        Sleep(delayTime * 1000)
+        ToolTip()
+        
+        ToolTip("点击位置 2: X" clickX2 " Y" clickY2, clickX2 + 20, clickY2 + 20)
+        Click(clickX2 " " clickY2)  ; 第二个用户捕获的位置
+        Sleep(delayTime * 1000)
+        ToolTip()
+        
+        ToolTip("点击位置 3: X1080 Y740", 1080 + 20, 740 + 20)
+        Click("1080 740")  ; 第三个固定位置
+        Sleep(delayTime * 1000)
+        ToolTip()
+        
+        ToolTip("点击位置 4: X1080 Y800", 1080 + 20, 800 + 20)
+        Click("1080 800")  ; 第四个固定位置
+        Sleep(delayTime * 1000)
+        ToolTip()
+        
+        ; 更新点击计数
+        totalClicks += 1
+        TotalClicksText.Text := "总点击次数: " totalClicks
+        
+        ; 如果不是最后一队，等待一下再发送下一队
+        if (A_Index < warriorCount) {
+            Sleep(100)  ; 等待2秒再发送下一队
+        }
+    }
 }
 
 ; 开始点击
 StartClicking(*) {
-    global clickX1, clickY1, clickX2, clickY2, startTime, intervalTime, delayTime, isRunning, clickTimer
+    global clickX1, clickY1, clickX2, clickY2, startTime, intervalTime, delayTime, warriorCount, isRunning, clickTimer
     
     if (clickX1 = 0 && clickY1 = 0 || clickX2 = 0 && clickY2 = 0) {
         ShowStatusTip("请先设置所有点击位置！")
@@ -184,6 +195,7 @@ StartClicking(*) {
     startTime := StartTimeEdit.Value
     intervalTime := IntervalEdit.Value
     delayTime := DelayEdit.Value
+    warriorCount := WarriorCountEdit.Value
     
     isRunning := true
     
@@ -202,7 +214,7 @@ StartClicking(*) {
         SetTimer(StartDelayedSequence, timeToWait * 1000)
     }
     
-    ShowStatusTip("已开始点击 - 间隔: " intervalTime "分钟")
+    ShowStatusTip("已开始点击 - 间隔: " intervalTime "分钟 - 每次发送" warriorCount "队武将")
 }
 
 ; 延迟启动序列
