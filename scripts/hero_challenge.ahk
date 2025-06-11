@@ -17,6 +17,10 @@ global MyGui := 0
 global configFile := A_ScriptDir "\..\config\settings.ini"
 global isGroupAttack := false  ; 是否集结攻击
 
+; 定义坐标序列
+global defaultCoords := "945,640|1080,700|1140,300|1080,800"
+global groupAttackCoords := "945,640|1080,700|1120,300|1080,800"  ; 集结攻击的坐标序列
+
 ; 从配置文件加载设置
 LoadSettings() {
     global intervalTime, maxCount, currentCount, isGroupAttack
@@ -58,14 +62,68 @@ CountEdit := MyGui.Add("Edit", "w260", maxCount)
 
 ; 添加攻击模式选择
 MyGui.Add("Text", "w260", "攻击模式:")
-MyGui.Add("Radio", "w260 vAttackMode" (isGroupAttack ? "" : " Checked"), "单独攻击")
-MyGui.Add("Radio", "w260" (isGroupAttack ? " Checked" : ""), "集结攻击")
+Radio1 := MyGui.Add("Radio", "w260 vAttackMode" (isGroupAttack ? "" : " Checked"), "单独攻击")
+Radio2 := MyGui.Add("Radio", "w260" (isGroupAttack ? " Checked" : ""), "集结攻击")
+
+; 添加事件处理
+Radio1.OnEvent("Click", (*) => UpdateAttackMode(1))
+Radio2.OnEvent("Click", (*) => UpdateAttackMode(2))
+
+; 更新攻击模式
+UpdateAttackMode(mode) {
+    global isGroupAttack, intervalTime, IntervalEdit
+    
+    isGroupAttack := mode = 2
+    
+    ; 根据攻击模式更新间隔时间
+    if (isGroupAttack) {
+        intervalTime := 200  ; 集结攻击默认200秒
+    } else {
+        intervalTime := 30   ; 单独攻击默认30秒
+    }
+    
+    ; 更新间隔时间输入框
+    IntervalEdit.Value := intervalTime
+    
+    ; 保存设置
+    SaveSettings()
+    
+    ; 显示提示
+    ShowStatusTip("已切换到" (isGroupAttack ? "集结攻击" : "单独攻击") "模式 - 间隔时间: " intervalTime "秒")
+    
+    ; 显示当前坐标序列
+    ShowCoordinateSequence()
+}
+
+; 显示当前坐标序列
+ShowCoordinateSequence(*) {
+    global isGroupAttack, defaultCoords, groupAttackCoords
+    
+    coords := isGroupAttack ? groupAttackCoords : defaultCoords
+    coordArray := StrSplit(coords, "|")
+    
+    sequence := "当前点击序列：`n"
+    for index, coord in coordArray {
+        xy := StrSplit(coord, ",")
+        x := xy[1]
+        y := xy[2]
+        sequence .= index ". X" x " Y" y "`n"
+        
+        ; 如果是集结攻击且是第三个位置，添加额外的点击
+        if (isGroupAttack && index = 3) {
+            sequence .= "3.5. X1070 Y595 (集结模式额外点击)`n"
+        }
+    }
+    
+    MsgBox(sequence, "当前点击序列")
+}
 
 ; 添加控制按钮
 StartButton := MyGui.Add("Button", "w260", "《开始挑战》").OnEvent("Click", StartChallenge)
 StopButton := MyGui.Add("Button", "w260", "停止挑战").OnEvent("Click", StopChallenge)
 CurrentCountText := MyGui.Add("Text", "w260", "当前执行次数: " currentCount)
 MyGui.Add("Button", "w260", "重置计数").OnEvent("Click", ResetCount)
+MyGui.Add("Button", "w260", "显示当前序列").OnEvent("Click", ShowCoordinateSequence)
 MyGui.Add("Text", "w260 vShortcutText", "快捷键: F1=开始/停止 F2=重载 F3=帮助")
 
 ; 显示窗口并设置位置
@@ -83,7 +141,7 @@ ShowStatusTip(text) {
 
 ; 执行点击序列
 PerformClickSequence() {
-    global currentCount, CurrentCountText, isRunning, maxCount, isGroupAttack
+    global currentCount, CurrentCountText, isRunning, maxCount, isGroupAttack, defaultCoords, groupAttackCoords
     
     if (!isRunning)
         return
@@ -95,8 +153,8 @@ PerformClickSequence() {
         return
     }
     
-    ; 从配置文件读取坐标
-    coords := IniRead(configFile, "HeroChallenge", "Coords", "930,600|1050,670|1110,290|1050,750")
+    ; 根据攻击模式选择坐标序列
+    coords := isGroupAttack ? groupAttackCoords : defaultCoords
     coordArray := StrSplit(coords, "|")
     
     ; 点击序列
@@ -104,11 +162,6 @@ PerformClickSequence() {
         xy := StrSplit(coord, ",")
         x := xy[1]
         y := xy[2]
-        
-        ; 如果是集结攻击且是第三个位置，调整x坐标
-        if (isGroupAttack && index = 3) {
-            x := 990  ; 向左偏移20
-        }
         
         ToolTip("点击位置 " index ": X" x " Y" y, x + 20, y + 20)
         Click(x " " y)
@@ -124,8 +177,8 @@ PerformClickSequence() {
         
         ; 如果是集结攻击且是第三个位置，添加额外的点击
         if (isGroupAttack && index = 3) {
-            ToolTip("点击位置 3.5: X1050 Y570", 1050 + 20, 570 + 20)
-            Click("1050 570")
+            ToolTip("点击位置 3.5: X1070 Y595", 1070 + 20, 595 + 20)
+            Click("1070 595")
             Sleep(1000)
             ToolTip()
         }
