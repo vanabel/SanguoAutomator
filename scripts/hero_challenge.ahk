@@ -15,26 +15,29 @@ global clickTimer := 0
 global statusTip := ""
 global MyGui := 0
 global configFile := A_ScriptDir "\..\config\settings.ini"
+global isGroupAttack := false  ; 是否集结攻击
 
 ; 从配置文件加载设置
 LoadSettings() {
-    global intervalTime, maxCount, currentCount
+    global intervalTime, maxCount, currentCount, isGroupAttack
     
     if (FileExist(configFile)) {
         intervalTime := IniRead(configFile, "HeroChallenge", "Interval", "30")
         maxCount := IniRead(configFile, "HeroChallenge", "Count", "30")
         currentCount := IniRead(configFile, "HeroChallenge", "CurrentCount", "0")
+        isGroupAttack := IniRead(configFile, "HeroChallenge", "IsGroupAttack", "false")
     }
 }
 
 ; 保存设置到配置文件
 SaveSettings() {
-    global intervalTime, maxCount, currentCount
+    global intervalTime, maxCount, currentCount, isGroupAttack
     
     if (FileExist(configFile)) {
         IniWrite(intervalTime, configFile, "HeroChallenge", "Interval")
         IniWrite(maxCount, configFile, "HeroChallenge", "Count")
         IniWrite(currentCount, configFile, "HeroChallenge", "CurrentCount")
+        IniWrite(isGroupAttack, configFile, "HeroChallenge", "IsGroupAttack")
     }
 }
 
@@ -52,6 +55,11 @@ MyGui.Add("Text", "w260", "间隔时间 (秒):")
 IntervalEdit := MyGui.Add("Edit", "w260", intervalTime)
 MyGui.Add("Text", "w260", "执行次数:")
 CountEdit := MyGui.Add("Edit", "w260", maxCount)
+
+; 添加攻击模式选择
+MyGui.Add("Text", "w260", "攻击模式:")
+MyGui.Add("Radio", "w260 vAttackMode" (isGroupAttack ? "" : " Checked"), "单独攻击")
+MyGui.Add("Radio", "w260" (isGroupAttack ? " Checked" : ""), "集结攻击")
 
 ; 添加控制按钮
 StartButton := MyGui.Add("Button", "w260", "《开始挑战》").OnEvent("Click", StartChallenge)
@@ -75,7 +83,7 @@ ShowStatusTip(text) {
 
 ; 执行点击序列
 PerformClickSequence() {
-    global currentCount, CurrentCountText, isRunning, maxCount
+    global currentCount, CurrentCountText, isRunning, maxCount, isGroupAttack
     
     if (!isRunning)
         return
@@ -96,10 +104,31 @@ PerformClickSequence() {
         xy := StrSplit(coord, ",")
         x := xy[1]
         y := xy[2]
+        
+        ; 如果是集结攻击且是第三个位置，调整x坐标
+        if (isGroupAttack && index = 3) {
+            x := 990  ; 向左偏移20
+        }
+        
         ToolTip("点击位置 " index ": X" x " Y" y, x + 20, y + 20)
         Click(x " " y)
-        Sleep(800)
+        
+        ; 第二个位置后等待更长时间以处理弹窗
+        if (index = 2) {
+            Sleep(2000)  ; 等待2秒处理弹窗
+        } else {
+            Sleep(1000)  ; 其他位置等待1秒
+        }
+        
         ToolTip()
+        
+        ; 如果是集结攻击且是第三个位置，添加额外的点击
+        if (isGroupAttack && index = 3) {
+            ToolTip("点击位置 3.5: X1050 Y570", 1050 + 20, 570 + 20)
+            Click("1050 570")
+            Sleep(1000)
+            ToolTip()
+        }
     }
     
     ; 更新计数
@@ -110,10 +139,21 @@ PerformClickSequence() {
 
 ; 开始挑战
 StartChallenge(*) {
-    global intervalTime, maxCount, isRunning, clickTimer, currentCount
+    global intervalTime, maxCount, isRunning, clickTimer, currentCount, isGroupAttack
     
     ; 获取设置的值
-    intervalTime := IntervalEdit.Value
+    isGroupAttack := MyGui["AttackMode"].Value = 2  ; 更新攻击模式
+    
+    ; 根据攻击模式设置默认间隔时间
+    if (isGroupAttack) {
+        intervalTime := 200  ; 集结攻击默认200秒
+    } else {
+        intervalTime := 30   ; 单独攻击默认30秒
+    }
+    
+    ; 更新间隔时间输入框
+    IntervalEdit.Value := intervalTime
+    
     maxCount := CountEdit.Value
     
     ; 检查是否已经完成
@@ -130,7 +170,7 @@ StartChallenge(*) {
     ; 设置定时器
     clickTimer := SetTimer(PerformClickSequence, intervalTime * 1000)
     
-    ShowStatusTip("已开始挑战 - 间隔: " intervalTime "秒 - 目标次数: " maxCount)
+    ShowStatusTip("已开始挑战 - 间隔: " intervalTime "秒 - 目标次数: " maxCount " - 模式: " (isGroupAttack ? "集结攻击" : "单独攻击"))
 }
 
 ; 停止挑战
@@ -190,10 +230,11 @@ ShowHelp() {
         . "F2 - 重载脚本`n"
         . "F3 - 显示此帮助信息`n`n"
         . "功能说明：`n"
-        . "1. 设置间隔时间（默认30秒）`n"
+        . "1. 设置间隔时间（默认30秒，集结攻击默认200秒）`n"
         . "2. 设置执行次数（默认30次）`n"
-        . "3. 点击《开始挑战》或按F1开始`n"
-        . "4. 执行次数会自动计数，可通过按钮重置"
+        . "3. 选择攻击模式（单独/集结）`n"
+        . "4. 点击《开始挑战》或按F1开始`n"
+        . "5. 执行次数会自动计数，可通过按钮重置"
     
     MsgBox(helpText, "煮酒论英雄-个人挑战帮助")
 }
