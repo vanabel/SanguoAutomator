@@ -18,8 +18,33 @@ global configFile := A_ScriptDir "\..\config\settings.ini"
 global isGroupAttack := false  ; 是否集结攻击，默认false
 
 ; 定义坐标序列
-global defaultCoords := "945,640|1080,700|1140,300|1080,800"
-global groupAttackCoords := "945,640|1080,700|1120,300|1080,800"  ; 集结攻击的坐标序列
+global defaultCoords := "945,640|1080,700|1140,300|1080,800"  ; 单独攻击的坐标序列
+global groupAttackCoords := "945,640|1080,700|1020,300|1070,595|1080,800"  ; 集结攻击的坐标序列，包含额外的点击位置
+
+; 测试坐标
+TestCoordinates(*) {
+    global isGroupAttack, defaultCoords, groupAttackCoords
+    
+    coords := isGroupAttack ? groupAttackCoords : defaultCoords
+    coordArray := StrSplit(coords, "|")
+    
+    for index, coord in coordArray {
+        xy := StrSplit(coord, ",")
+        x := xy[1]
+        y := xy[2]
+        
+        ; 移动鼠标到位置
+        MouseMove(x, y)
+        
+        ; 显示提示
+        ToolTip("点击位置 " index ": X" x " Y" y, x + 20, y + 20)
+        Sleep(3000)
+        ToolTip()
+    }
+    
+    ; 测试完成后显示提示
+    ShowStatusTip("坐标测试完成")
+}
 
 ; 从配置文件加载设置
 LoadSettings() {
@@ -103,6 +128,12 @@ UpdateAttackMode(mode) {
     
     ; 更新坐标序列显示
     UpdateCoordinateSequence()
+    
+    ; 如果正在运行，停止当前执行
+    if (isRunning) {
+        StopChallenge()
+        ShowStatusTip("已停止当前执行，请重新开始挑战")
+    }
 }
 
 ; 更新坐标序列显示
@@ -118,11 +149,6 @@ UpdateCoordinateSequence(*) {
         x := xy[1]
         y := xy[2]
         sequence .= index ". X" x " Y" y "`n"
-        
-        ; 如果是集结攻击且是第三个位置，添加额外的点击
-        if (isGroupAttack && index = 3) {
-            sequence .= "3.5. X1070 Y595 (集结模式额外点击)`n"
-        }
     }
     
     SequenceText.Text := sequence
@@ -134,6 +160,7 @@ StopButton := MyGui.Add("Button", "w260", "停止挑战").OnEvent("Click", StopC
 CurrentCountText := MyGui.Add("Text", "w260", "当前执行次数: " currentCount)
 MyGui.Add("Button", "w260", "重置计数").OnEvent("Click", ResetCount)
 MyGui.Add("Button", "w260", "更新序列显示").OnEvent("Click", UpdateCoordinateSequence)
+MyGui.Add("Button", "w260", "测试坐标").OnEvent("Click", TestCoordinates)
 MyGui.Add("Text", "w260 vShortcutText", "快捷键: F1=开始/停止 F2=重载 F3=帮助")
 
 ; 显示窗口并设置位置
@@ -154,7 +181,7 @@ ShowStatusTip(text) {
 
 ; 执行点击序列
 PerformClickSequence() {
-    global currentCount, CurrentCountText, isRunning, maxCount, isGroupAttack, defaultCoords, groupAttackCoords
+    global currentCount, CurrentCountText, isRunning, maxCount, isGroupAttack, defaultCoords, groupAttackCoords, intervalTime, clickTimer
     
     if (!isRunning)
         return
@@ -165,9 +192,6 @@ PerformClickSequence() {
         ShowStatusTip("已完成" maxCount "次挑战")
         return
     }
-    
-    ; 获取当前的攻击模式
-    isGroupAttack := MyGui["AttackMode"].Value = 2
     
     ; 根据攻击模式选择坐标序列
     coords := isGroupAttack ? groupAttackCoords : defaultCoords
@@ -190,14 +214,6 @@ PerformClickSequence() {
         }
         
         ToolTip()
-        
-        ; 如果是集结攻击且是第三个位置，添加额外的点击
-        if (isGroupAttack && index = 3) {
-            ToolTip("点击位置 3.5: X1070 Y595", 1070 + 20, 595 + 20)
-            Click("1070 595")
-            Sleep(1000)
-            ToolTip()
-        }
     }
     
     ; 更新计数
@@ -210,19 +226,7 @@ PerformClickSequence() {
 StartChallenge(*) {
     global intervalTime, maxCount, isRunning, clickTimer, currentCount, isGroupAttack
     
-    ; 获取设置的值
-    isGroupAttack := MyGui["AttackMode"].Value = 2  ; 更新攻击模式
-    
-    ; 根据攻击模式设置默认间隔时间
-    if (isGroupAttack) {
-        intervalTime := 200  ; 集结攻击默认200秒
-    } else {
-        intervalTime := 30   ; 单独攻击默认30秒
-    }
-    
-    ; 更新间隔时间输入框
-    IntervalEdit.Value := intervalTime
-    
+    ; 获取执行次数
     maxCount := CountEdit.Value
     
     ; 检查是否已经完成
@@ -264,7 +268,6 @@ ResetCount(*) {
     currentCount := 0
     CurrentCountText.Text := "当前执行次数: 0"
     SaveSettings()  ; 保存重置后的计数
-    ShowStatusTip("执行次数已重置")
 }
 
 ; 按ESC键退出程序
