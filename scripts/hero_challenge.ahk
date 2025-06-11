@@ -15,7 +15,7 @@ global clickTimer := 0
 global statusTip := ""
 global MyGui := 0
 global configFile := A_ScriptDir "\..\config\settings.ini"
-global isGroupAttack := false  ; 是否集结攻击
+global isGroupAttack := false  ; 是否集结攻击，默认false
 
 ; 定义坐标序列
 global defaultCoords := "945,640|1080,700|1140,300|1080,800"
@@ -30,6 +30,12 @@ LoadSettings() {
         maxCount := IniRead(configFile, "HeroChallenge", "Count", "30")
         currentCount := IniRead(configFile, "HeroChallenge", "CurrentCount", "0")
         isGroupAttack := IniRead(configFile, "HeroChallenge", "IsGroupAttack", "false")
+        
+        ; 确保初始化为单独攻击模式
+        if (isGroupAttack = "true") {
+            isGroupAttack := false
+            intervalTime := 30
+        }
     }
 }
 
@@ -69,6 +75,10 @@ Radio2 := MyGui.Add("Radio", "w260" (isGroupAttack ? " Checked" : ""), "集结�
 Radio1.OnEvent("Click", (*) => UpdateAttackMode(1))
 Radio2.OnEvent("Click", (*) => UpdateAttackMode(2))
 
+; 添加坐标序列显示区域
+MyGui.Add("Text", "w260", "当前点击序列:")
+SequenceText := MyGui.Add("Text", "w260 h100", "")
+
 ; 更新攻击模式
 UpdateAttackMode(mode) {
     global isGroupAttack, intervalTime, IntervalEdit
@@ -91,18 +101,18 @@ UpdateAttackMode(mode) {
     ; 显示提示
     ShowStatusTip("已切换到" (isGroupAttack ? "集结攻击" : "单独攻击") "模式 - 间隔时间: " intervalTime "秒")
     
-    ; 显示当前坐标序列
-    ShowCoordinateSequence()
+    ; 更新坐标序列显示
+    UpdateCoordinateSequence()
 }
 
-; 显示当前坐标序列
-ShowCoordinateSequence(*) {
-    global isGroupAttack, defaultCoords, groupAttackCoords
+; 更新坐标序列显示
+UpdateCoordinateSequence(*) {
+    global isGroupAttack, defaultCoords, groupAttackCoords, SequenceText
     
     coords := isGroupAttack ? groupAttackCoords : defaultCoords
     coordArray := StrSplit(coords, "|")
     
-    sequence := "当前点击序列：`n"
+    sequence := ""
     for index, coord in coordArray {
         xy := StrSplit(coord, ",")
         x := xy[1]
@@ -115,7 +125,7 @@ ShowCoordinateSequence(*) {
         }
     }
     
-    MsgBox(sequence, "当前点击序列")
+    SequenceText.Text := sequence
 }
 
 ; 添加控制按钮
@@ -123,13 +133,16 @@ StartButton := MyGui.Add("Button", "w260", "《开始挑战》").OnEvent("Click"
 StopButton := MyGui.Add("Button", "w260", "停止挑战").OnEvent("Click", StopChallenge)
 CurrentCountText := MyGui.Add("Text", "w260", "当前执行次数: " currentCount)
 MyGui.Add("Button", "w260", "重置计数").OnEvent("Click", ResetCount)
-MyGui.Add("Button", "w260", "显示当前序列").OnEvent("Click", ShowCoordinateSequence)
+MyGui.Add("Button", "w260", "更新序列显示").OnEvent("Click", UpdateCoordinateSequence)
 MyGui.Add("Text", "w260 vShortcutText", "快捷键: F1=开始/停止 F2=重载 F3=帮助")
 
 ; 显示窗口并设置位置
 MyGui.Show()
 WinGetPos(&X, &Y, &Width, &Height, "煮酒论英雄-个人挑战")
 MyGui.Move(0, A_ScreenHeight - Height - 50)
+
+; 初始化显示坐标序列
+UpdateCoordinateSequence()
 
 ; 显示状态提示
 ShowStatusTip(text) {
@@ -152,6 +165,9 @@ PerformClickSequence() {
         ShowStatusTip("已完成" maxCount "次挑战")
         return
     }
+    
+    ; 获取当前的攻击模式
+    isGroupAttack := MyGui["AttackMode"].Value = 2
     
     ; 根据攻击模式选择坐标序列
     coords := isGroupAttack ? groupAttackCoords : defaultCoords
